@@ -166,10 +166,17 @@ many models, and per-step routing:
 ```bash
 LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=...
-OPENROUTER_MODEL=anthropic/claude-sonnet-4   # any OpenRouter model id
-IDENTIFY_MODEL=...   MATCH_MODEL=...          # optional: cheap model for match,
-                                              # strong vision model for identify
+OPENROUTER_MODEL=google/gemini-2.5-flash-lite   # cheap + vision-capable default
+IDENTIFY_MODEL=google/gemini-2.5-flash-lite      # vision step (reads photos)
+MATCH_MODEL=deepseek/deepseek-chat               # text-only step — cheapest
 ```
+
+Cost-effective picks (OpenRouter, ~mid-2026): identify needs a **vision** model —
+`google/gemini-2.5-flash-lite` (~$0.10/$0.40 per M) is the cheapest capable one;
+`openai/gpt-5-mini` (~$0.25/$2) or `google/gemini-2.5-flash` (~$0.30/$2.50) are
+step-ups. The match step is **text-only**, so point `MATCH_MODEL` at the
+cheapest text model (DeepSeek tiers are ~$0.10/M or free). The price pre-filter
++ verdict caching keep spend to fractions of a cent per comped listing.
 
 No key for the active provider → identify/match fall back to offline heuristics.
 

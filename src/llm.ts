@@ -40,7 +40,7 @@ export function llmConfigured(): boolean {
 
 export function defaultModel(pv: Provider = provider()): string {
   return pv === "openrouter"
-    ? process.env.OPENROUTER_MODEL ?? "anthropic/claude-sonnet-4"
+    ? process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash-lite" // cheap + vision-capable
     : process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 }
 
