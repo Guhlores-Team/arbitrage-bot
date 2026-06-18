@@ -7,7 +7,7 @@
     "maxItems": { "title": "Max lots", "type": "integer", "description": "Maximum number of auction lots to return.", "default": 40, "minimum": 1, "maximum": 200 },
     "maxScrolls": { "title": "Max scrolls", "type": "integer", "description": "Maximum number of page scrolls to load more results.", "default": 8, "minimum": 1, "maximum": 40 },
     "maxPrice": { "title": "Max current bid", "type": "integer", "description": "Only return lots whose current bid is at or below this amount (optional).", "nullable": true, "minimum": 0 },
-    "proxyConfiguration": { "title": "Proxy", "type": "object", "editor": "proxy", "default": { "useApifyProxy": true, "apifyProxyGroups": ["RESIDENTIAL"] } }
+    "proxyConfiguration": { "title": "Proxy", "type": "object", "description": "Use Apify residential proxies (recommended) or your own.", "editor": "proxy", "default": { "useApifyProxy": true, "apifyProxyGroups": ["RESIDENTIAL"] } }
   },
   "required": ["query"]
 }

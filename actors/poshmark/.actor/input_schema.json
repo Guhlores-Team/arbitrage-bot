@@ -8,7 +8,7 @@
     "maxItems": { "title": "Max listings", "type": "integer", "description": "Maximum number of listings to return.", "default": 24, "minimum": 1, "maximum": 200 },
     "maxScrolls": { "title": "Max scrolls", "type": "integer", "description": "Maximum number of page scrolls to load more results.", "default": 10, "minimum": 1, "maximum": 60 },
     "maxPrice": { "title": "Max price", "type": "integer", "description": "Only return listings at or below this price (optional).", "nullable": true, "minimum": 0 },
-    "proxyConfiguration": { "title": "Proxy", "type": "object", "editor": "proxy", "default": { "useApifyProxy": true, "apifyProxyGroups": ["RESIDENTIAL"] } }
+    "proxyConfiguration": { "title": "Proxy", "type": "object", "description": "Use Apify residential proxies (recommended) or your own.", "editor": "proxy", "default": { "useApifyProxy": true, "apifyProxyGroups": ["RESIDENTIAL"] } }
   },
   "required": ["query"]
 }
