@@ -13,9 +13,10 @@ so new sources slot in without touching the engine.
 
 ## What's included
 
-- **Web dashboard** — three tabs: **Scan** (run a search, tune thresholds, browse
-  scored cards), **Saved** (opportunities that passed, persisted across runs),
-  **Watch** (scheduled watchlists). Zero-dep server, binds to loopback.
+- **Web dashboard** — four tabs: **Scan** (search, tune thresholds, stats bar +
+  sort/filter toolbar over scored cards), **Saved** (passing opportunities,
+  persisted), **Watch** (scheduled watchlists), **Settings** (engine + alert
+  status, test-alert button). Zero-dep server, binds to loopback.
 - **Watch / alert mode** — saved watchlists scanned on a schedule (`npm run
   watch`), auto-saving new passing opportunities and printing alerts.
 - **Persistence** — zero-infra JSON store out of the box (saved feed +
@@ -76,6 +77,29 @@ It re-reads the store each tick, so watchlists you add/pause/edit in the
 dashboard take effect without a restart. For Postgres instead of the JSON store,
 set `DATABASE_URL` and `npm run prisma:push` (schema in `prisma/`).
 
+**Push alerts** — the watch runner (and the dashboard's "run now") send new finds
+to any configured channel; nothing configured = console only. Test from the
+**Settings** tab. Env:
+
+```bash
+TELEGRAM_BOT_TOKEN=...   TELEGRAM_CHAT_ID=...   # Telegram
+ALERT_WEBHOOK_URL=https://hooks.slack.com/...  # Slack / Discord / generic webhook
+```
+
+## eBay comps: sold vs. active
+
+`EBAY_COMP_SOURCE` selects how items are valued (default `auto`):
+
+| value | data | access |
+|-------|------|--------|
+| `insights` | real **sold** prices (Marketplace Insights) | gated — apply to eBay |
+| `browse` | **active** asking prices (Browse API) | ungated — just app credentials |
+| `mock` | deterministic offline comps | none |
+| `auto` | insights → browse → mock fallback | — |
+
+Set `EBAY_CLIENT_ID`/`EBAY_CLIENT_SECRET` and `EBAY_USE_MOCK_COMPS=false` to go
+live. Browse asks are a rougher comp than solds, but free and ungated.
+
 ## Facebook Marketplace (scrape-with-safeguards)
 
 Marketplace has no public API or feed, so this source drives a real browser:
@@ -100,6 +124,10 @@ Config (env): `FACEBOOK_USER_DATA_DIR` (default `.fb-session`, gitignored),
 **OfferUp** (`--source=offerup`) uses the same browser + stealth layer but needs
 no login (public search). Best-effort selectors; same ToS caveat and safeguards.
 Set `OFFERUP_HEADFUL=true` to watch it run.
+
+**Craigslist photos** — RSS omits images. Set `CRAIGSLIST_ENRICH=true` to fetch
+each listing page (throttled, capped) and fill real image URLs + missing prices,
+so the vision-identify step has photos to work with.
 
 ## Wiring real data
 

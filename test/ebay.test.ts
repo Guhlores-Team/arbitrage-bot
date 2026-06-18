@@ -21,7 +21,9 @@ test("mock comps are deterministic and need no credentials", async () => {
   assert.equal(c.effectiveSource, "mock");
   const a = await c.getSoldComps("nintendo switch", 8);
   const b = await c.getSoldComps("nintendo switch", 8);
-  assert.deepEqual(a, b);
+  // soldAt embeds Date.now(), so compare the deterministic price signal only.
+  assert.deepEqual(a.map((x) => x.soldPrice), b.map((x) => x.soldPrice));
+  assert.deepEqual(a.map((x) => x.id), b.map((x) => x.id));
   assert.ok(a.length > 0 && a.every((x) => x.soldPrice > 0));
 });
 
