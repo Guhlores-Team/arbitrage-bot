@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, extname } from "node:path";
-import { SOURCES } from "./sources.js";
+import { SOURCES, isValidSourceSpec } from "./sources.js";
 import { THRESHOLDS } from "./scoring/score.js";
 import { parseScanParams, runScan } from "./scan.js";
 import { store } from "./store.js";
@@ -80,7 +80,12 @@ const server = createServer(async (req, res) => {
     }
 
     if (method === "POST" && path === "/api/search") {
-      return await handleSearch(res, await readBody(req));
+      return startSearchJob(res, await readBody(req));
+    }
+    const jobMatch = path.match(/^\/api\/search\/([\w-]+)$/);
+    if (method === "GET" && jobMatch) {
+      const job = jobs.get(jobMatch[1]);
+      return job ? json(res, 200, job) : json(res, 404, { error: "job not found" });
     }
 
     if (path === "/api/opportunities") {
@@ -160,15 +165,35 @@ const server = createServer(async (req, res) => {
   }
 });
 
-async function handleSearch(res: any, body: any) {
-  const params = parseScanParams(body);
-  const result = await serialize(() => runScan(params));
-  // Persist the passing opportunities so they show up in the saved feed.
-  const passing = result.opportunities.filter((o) => o.passes);
-  const added = passing.length
-    ? await store.saveOpportunities(passing, { source: params.source, query: params.query })
-    : [];
-  return json(res, 200, { ...result, meta: { ...result.meta, newlySaved: added.length } });
+// Async scan jobs: scraping many sources can take minutes — too long for one
+// mobile HTTP request. POST returns a jobId immediately; the client polls
+// GET /api/search/:jobId. Keeps every request short so phones don't time out.
+interface ScanJob {
+  status: "running" | "done" | "error";
+  result?: unknown;
+  error?: string;
+  at: number;
+}
+const jobs = new Map<string, ScanJob>();
+
+function startSearchJob(res: any, body: any) {
+  const params = parseScanParams(body); // throws -> 400 on bad input
+  // prune jobs older than 15 min
+  const cutoff = Date.now() - 15 * 60_000;
+  for (const [id, j] of jobs) if (j.at < cutoff) jobs.delete(id);
+
+  const jobId = Math.random().toString(36).slice(2, 12);
+  jobs.set(jobId, { status: "running", at: Date.now() });
+  serialize(() => runScan(params))
+    .then(async (result) => {
+      const passing = result.opportunities.filter((o) => o.passes);
+      const added = passing.length
+        ? await store.saveOpportunities(passing, { source: params.source, query: params.query })
+        : [];
+      jobs.set(jobId, { status: "done", at: Date.now(), result: { ...result, meta: { ...result.meta, newlySaved: added.length } } });
+    })
+    .catch((e) => jobs.set(jobId, { status: "error", at: Date.now(), error: String(e?.message ?? e) }));
+  return json(res, 202, { jobId });
 }
 
 async function handleCreateWatchlist(res: any, body: any) {
@@ -209,7 +234,7 @@ async function handleCreateSweep(res: any, body: any) {
         .filter(Boolean);
   if (!keywords.length) return json(res, 400, { error: "keywords are required" });
   const source = String(body?.source ?? "demo");
-  if (!SOURCES.includes(source as any)) return json(res, 400, { error: `unknown source "${source}"` });
+  if (!isValidSourceSpec(source)) return json(res, 400, { error: `unknown source "${source}"` });
 
   const sweep = await store.addSweep({
     label: String(body?.label ?? "Discovery").slice(0, 60),

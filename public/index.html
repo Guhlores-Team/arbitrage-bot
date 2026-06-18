@@ -56,9 +56,9 @@
   .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; }
   form.search { display: grid; grid-template-columns: 1fr 132px 156px auto; gap: 12px; align-items: end; }
   label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); margin-bottom: 7px; }
-  input, select {
+  input, select, textarea {
     width: 100%; background: var(--bg); border: 1px solid var(--line-2); color: var(--ink);
-    border-radius: var(--r); padding: 10px 12px; font-size: 14px; outline: none; transition: border-color .12s;
+    border-radius: var(--r); padding: 10px 12px; font-size: 16px; outline: none; transition: border-color .12s;
   }
   input::placeholder { color: var(--ink-3); }
   input:focus, select:focus { border-color: var(--brand); }
@@ -163,6 +163,19 @@
     .stats { grid-template-columns: repeat(2, 1fr); } .cols { grid-template-columns: 1fr; }
     form.search { grid-template-columns: 1fr 1fr; } .sliders { grid-template-columns: 1fr; }
   }
+  /* phones: stack every form field full-width (fixes cramped sweep name / inputs) */
+  @media (max-width: 600px) {
+    .topbar, .content { padding-left: 16px; padding-right: 16px; }
+    .grid { grid-template-columns: 1fr; }
+    form.search { grid-template-columns: 1fr !important; gap: 10px; }
+    form.search button.go { width: 100%; height: 46px; }
+    .toolbar { flex-direction: column; align-items: stretch; }
+    .toolbar input[type=text], .toolbar select { width: 100%; }
+    .toolbar .right { margin-left: 0; }
+    .acts { flex-wrap: wrap; } .acts button { flex: 1 1 40%; }
+    .tab { padding: 9px 12px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
 </style>
 </head>
 <body>
@@ -256,7 +269,7 @@
       <!-- DISCOVER -->
       <section class="view" id="view-discover">
         <div class="panel">
-          <form class="search" id="swForm" style="grid-template-columns: 1fr 132px 156px auto;">
+          <form class="search" id="swForm" style="grid-template-columns: 1.6fr 110px 150px auto;">
             <div><label for="swLabel">Sweep name</label><input id="swLabel" placeholder="e.g. Electronics flips" value="Electronics flips" autocomplete="off" /></div>
             <div><label for="swCap">Max buy $</label><input id="swCap" type="number" min="0" placeholder="any" /></div>
             <div><label for="swSource">Source</label><select id="swSource"></select></div>
@@ -330,8 +343,8 @@ async function loadConfig() {
   const liveCount = config.sources.filter((s) => s !== "demo").length;
   const opts = `<option value="all">all sources (${liveCount})</option>` + config.sources.map((s) => `<option value="${s}">${s}</option>`).join("");
   $("source").innerHTML = opts; $("wlSource").innerHTML = opts; $("swSource").innerHTML = opts;
-  $("source").value = config.sources.includes("demo") ? "demo" : config.sources[0];
-  $("swSource").value = $("source").value;
+  // default to real listings ("all"), not the demo sample
+  $("source").value = "all"; $("wlSource").value = "all"; $("swSource").value = "all";
   $("minMargin").value = config.thresholds.minMarginPct;
   $("minProfit").value = config.thresholds.minAbsoluteProfit;
   $("minConf").value = config.thresholds.minMatchConfidence;
@@ -443,16 +456,28 @@ function renderScan() {
   $("results").innerHTML = lastScan.length ? gridify(filtered, "Nothing matches your filters.") : "";
   if (lastScan.length) { wireToolbar("scan", scanState, renderScan); $("scanCount").textContent = `${filtered.length} shown`; }
 }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function run(e) {
   e.preventDefault();
   const go = $("go"); go.disabled = true; go.textContent = "Scanning…";
   $("scanStats").innerHTML = ""; $("scanToolbar").innerHTML = "";
-  $("results").innerHTML = `<div class="state"><div class="spinner"></div>Pulling listings · comping · scoring…</div>`;
+  $("results").innerHTML = `<div class="state"><div class="spinner"></div>Pulling listings · comping · scoring…<br><span class="muted">Scanning all sources can take a minute.</span></div>`;
   try {
+    // Kick off an async job (browser scrapers can take minutes — too long for one request)
     const res = await fetch("/api/search", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: $("q").value, source: $("source").value, maxPrice: $("cap").value || undefined, thresholds: thresholdsFromSliders() }) });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "request failed");
+    const start = await res.json();
+    if (!res.ok) throw new Error(start.error || "request failed");
+    // Poll the job until done (short requests = no mobile timeout)
+    let data;
+    for (let i = 0; i < 150; i++) {
+      await sleep(2000);
+      const jr = await fetch(`/api/search/${start.jobId}`);
+      const job = await jr.json();
+      if (job.status === "done") { data = job.result; break; }
+      if (job.status === "error") throw new Error(job.error || "scan failed");
+    }
+    if (!data) throw new Error("scan timed out — try a single source");
     lastScan = data.opportunities; renderScan();
     if (data.meta.passing) { toast(`${data.meta.newlySaved ?? data.meta.passing} new saved · ${data.meta.tookMs} ms`); loadSaved(); }
     else toast(`No opportunities passed · ${data.meta.count} scanned`);
