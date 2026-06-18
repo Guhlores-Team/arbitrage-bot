@@ -1,0 +1,26 @@
+{
+  "name": "arbitrage-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Source-local / flip-on-eBay arbitrage engine. Connectors -> identify -> comp -> match -> score.",
+  "scripts": {
+    "dev": "tsx watch src/run.ts",
+    "run": "tsx src/run.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/run.js",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@prisma/client": "^5.22.0",
+    "fast-xml-parser": "^4.5.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.9.0"
+  }
+}

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+*.log
+
+# Playwright persistent session (holds your logged-in Facebook cookies — never commit)
+.fb-session/

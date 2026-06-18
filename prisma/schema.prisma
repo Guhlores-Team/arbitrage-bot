@@ -1,0 +1,64 @@
+// Optional persistence layer. The CLI demo runs without it, but once you want
+// scheduling, dedup, and an opportunity feed, push this and write through it.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Listing {
+  id          String   @id // e.g. cl_7712345678
+  source      String
+  rawTitle    String
+  description String?
+  price       Float
+  currency    String   @default("USD")
+  imageUrls   String[]
+  url         String
+  location    String?
+  postedAt    DateTime?
+  fetchedAt   DateTime @default(now())
+
+  opportunity Opportunity?
+
+  @@index([source])
+}
+
+model Opportunity {
+  id              String   @id @default(cuid())
+  listing         Listing  @relation(fields: [listingId], references: [id])
+  listingId       String   @unique
+
+  brand           String?
+  model           String?
+  searchString    String
+  referencePrice  Float
+  compCount       Int
+  matchConfidence Float
+  netProfit       Float
+  marginPct       Float
+  score           Float
+  flags           String[]
+  passes          Boolean  @default(false)
+
+  createdAt       DateTime @default(now())
+
+  @@index([score])
+  @@index([passes])
+}
+
+// Cache of LLM match verdicts so re-runs don't re-pay.
+model MatchVerdict {
+  id           String  @id @default(cuid())
+  cacheKey     String  @unique // searchString::compId
+  isMatch      Boolean
+  confidence   Float
+  variantMatch Boolean
+  conditionDelta Int
+  reasoning    String
+  createdAt    DateTime @default(now())
+}
