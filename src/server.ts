@@ -3,21 +3,26 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, extname } from "node:path";
-import { EbayCompConnector } from "./connectors/ebay.js";
-import { pickSource, SOURCES } from "./sources.js";
-import { runPipeline } from "./pipeline.js";
+import { SOURCES } from "./sources.js";
 import { THRESHOLDS } from "./scoring/score.js";
-import type { Opportunity } from "./types.js";
+import { parseScanParams, runScan } from "./scan.js";
+import { store } from "./store.js";
 
 /**
  * Dashboard server. Zero external deps — Node's http only — so it starts with
  * `npm run dashboard` and no build step. Serves the static UI in /public and a
- * small JSON API the UI calls to run the pipeline.
+ * small JSON API.
  *
- *   GET  /                -> dashboard
- *   GET  /api/config      -> sources + current thresholds + key/mode status
- *   POST /api/search      -> { query, source, maxPrice?, limit?, thresholds? }
- *                            -> { opportunities, meta }
+ *   GET    /                     -> dashboard
+ *   GET    /api/config           -> sources + thresholds + key/mode status
+ *   POST   /api/search           -> run a scan (and auto-save passing results)
+ *   GET    /api/opportunities    -> saved feed   (?passingOnly=1)
+ *   DELETE /api/opportunities    -> clear saved feed
+ *   GET    /api/watchlists       -> list watchlists
+ *   POST   /api/watchlists       -> create a watchlist
+ *   PATCH  /api/watchlists/:id   -> update (e.g. enable/disable)
+ *   DELETE /api/watchlists/:id   -> remove
+ *   POST   /api/watchlists/:id/run -> run one watchlist now
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,8 +43,10 @@ const MIME: Record<string, string> = {
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
+    const path = url.pathname;
+    const method = req.method ?? "GET";
 
-    if (req.method === "GET" && url.pathname === "/api/config") {
+    if (method === "GET" && path === "/api/config") {
       return json(res, 200, {
         sources: SOURCES,
         thresholds: THRESHOLDS,
@@ -48,87 +55,90 @@ const server = createServer(async (req, res) => {
       });
     }
 
-    if (req.method === "POST" && url.pathname === "/api/search") {
-      const body = await readBody(req);
-      return await handleSearch(res, body);
+    if (method === "POST" && path === "/api/search") {
+      return await handleSearch(res, await readBody(req));
     }
 
-    if (req.method === "GET") return await serveStatic(res, url.pathname);
+    if (path === "/api/opportunities") {
+      if (method === "GET") {
+        return json(res, 200, {
+          opportunities: await store.listOpportunities({ passingOnly: url.searchParams.get("passingOnly") === "1" }),
+        });
+      }
+      if (method === "DELETE") {
+        await store.clearOpportunities();
+        return json(res, 200, { ok: true });
+      }
+    }
 
+    if (path === "/api/watchlists") {
+      if (method === "GET") return json(res, 200, { watchlists: await store.listWatchlists() });
+      if (method === "POST") return await handleCreateWatchlist(res, await readBody(req));
+    }
+
+    const wlMatch = path.match(/^\/api\/watchlists\/([\w-]+)(\/run)?$/);
+    if (wlMatch) {
+      const id = wlMatch[1];
+      const runNow = Boolean(wlMatch[2]);
+      if (method === "POST" && runNow) return await handleRunWatchlist(res, id);
+      if (method === "PATCH") {
+        const wl = await store.updateWatchlist(id, await readBody(req));
+        return wl ? json(res, 200, { watchlist: wl }) : json(res, 404, { error: "not found" });
+      }
+      if (method === "DELETE") {
+        const ok = await store.removeWatchlist(id);
+        return ok ? json(res, 200, { ok: true }) : json(res, 404, { error: "not found" });
+      }
+    }
+
+    if (method === "GET") return await serveStatic(res, path);
     return json(res, 405, { error: "method not allowed" });
   } catch (err: any) {
-    json(res, 500, { error: String(err?.message ?? err) });
+    json(res, 400, { error: String(err?.message ?? err) });
   }
 });
 
 async function handleSearch(res: any, body: any) {
-  const query = String(body?.query ?? "").trim();
-  const source = String(body?.source ?? "demo");
-  if (!query) return json(res, 400, { error: "query is required" });
-  if (!SOURCES.includes(source as any)) return json(res, 400, { error: `unknown source "${source}"` });
-
-  const maxPrice = body?.maxPrice ? Number(body.maxPrice) : undefined;
-  const limit = body?.limit ? Math.min(Number(body.limit), 50) : 25;
-  const thresholds = body?.thresholds
-    ? {
-        minMarginPct: Number(body.thresholds.minMarginPct ?? THRESHOLDS.minMarginPct),
-        minAbsoluteProfit: Number(body.thresholds.minAbsoluteProfit ?? THRESHOLDS.minAbsoluteProfit),
-        minMatchConfidence: Number(body.thresholds.minMatchConfidence ?? THRESHOLDS.minMatchConfidence),
-      }
-    : undefined;
-
-  const started = Date.now();
-  const opps = await serialize(() =>
-    runPipeline(
-      pickSource(source),
-      new EbayCompConnector(),
-      { query, maxPrice, limit },
-      { hardPriceCap: maxPrice, thresholds },
-    ),
-  );
-
-  return json(res, 200, {
-    opportunities: opps.map(serializeOpp),
-    meta: {
-      source,
-      query,
-      count: opps.length,
-      passing: opps.filter((o) => !o.flags.includes("DOES NOT PASS THRESHOLDS")).length,
-      tookMs: Date.now() - started,
-    },
-  });
+  const params = parseScanParams(body);
+  const result = await serialize(() => runScan(params));
+  // Persist the passing opportunities so they show up in the saved feed.
+  const passing = result.opportunities.filter((o) => o.passes);
+  if (passing.length) await store.saveOpportunities(passing, { source: params.source, query: params.query });
+  return json(res, 200, result);
 }
 
-function serializeOpp(o: Opportunity) {
-  return {
-    id: o.sourceListing.id,
-    title: o.sourceListing.rawTitle,
-    brand: o.identity.brand ?? null,
-    model: o.identity.model ?? null,
-    image: o.sourceListing.imageUrls[0] ?? null,
-    url: o.sourceListing.url,
-    location: o.sourceListing.location ?? null,
-    buy: o.sourceListing.price,
-    resale: o.referencePrice,
-    net: Math.round(o.netProfit),
-    marginPct: o.marginPct,
-    fees: Math.round(o.estimatedFees),
-    shipping: o.estimatedShipping,
-    compCount: o.compCount,
-    matchConfidence: o.matchConfidence,
-    identityConfidence: o.identity.confidence,
-    condition: o.identity.condition,
-    score: o.score,
-    passes: !o.flags.includes("DOES NOT PASS THRESHOLDS"),
-    flags: o.flags,
-  };
+async function handleCreateWatchlist(res: any, body: any) {
+  // Validate the scan portion up front so bad watchlists never get stored.
+  const p = parseScanParams(body);
+  const intervalMin = Math.max(1, Number(body?.intervalMin ?? 30));
+  const wl = await store.addWatchlist({
+    query: p.query,
+    source: p.source,
+    maxPrice: p.maxPrice,
+    thresholds: p.thresholds,
+    intervalMin,
+  });
+  return json(res, 201, { watchlist: wl });
+}
+
+async function handleRunWatchlist(res: any, id: string) {
+  const wl = (await store.listWatchlists()).find((w) => w.id === id);
+  if (!wl) return json(res, 404, { error: "not found" });
+  const result = await serialize(() =>
+    runScan({ query: wl.query, source: wl.source, maxPrice: wl.maxPrice, thresholds: wl.thresholds }),
+  );
+  const passing = result.opportunities.filter((o) => o.passes);
+  const added = passing.length
+    ? await store.saveOpportunities(passing, { source: wl.source, query: wl.query })
+    : 0;
+  await store.updateWatchlist(id, { lastRunAt: new Date().toISOString(), lastFoundCount: passing.length });
+  return json(res, 200, { meta: result.meta, newlySaved: added });
 }
 
 async function serveStatic(res: any, pathname: string) {
   const rel = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-  // prevent path traversal
   const filePath = join(PUBLIC_DIR, rel);
-  if (!filePath.startsWith(PUBLIC_DIR)) return json(res, 403, { error: "forbidden" });
+  if (!filePath.startsWith(PUBLIC_DIR)) return json(res, 403, { error: "forbidden" }); // no traversal
   try {
     const data = await readFile(filePath);
     res.writeHead(200, { "Content-Type": MIME[extname(filePath)] ?? "application/octet-stream" });
@@ -169,9 +179,8 @@ function readBody(req: any): Promise<any> {
 }
 
 function json(res: any, status: number, payload: unknown) {
-  const data = JSON.stringify(payload);
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
-  res.end(data);
+  res.end(JSON.stringify(payload));
 }
 
 server.listen(PORT, HOST, () => {

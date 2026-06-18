@@ -5,3 +5,6 @@ dist/
 
 # Playwright persistent session (holds your logged-in Facebook cookies — never commit)
 .fb-session/
+
+# Local JSON store (saved opportunities + watchlists)
+data/

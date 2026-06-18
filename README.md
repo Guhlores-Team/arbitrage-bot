@@ -13,13 +13,19 @@ so new sources slot in without touching the engine.
 
 ## What's included
 
-- **Web dashboard** — run scans, pick a source, tune thresholds, and browse
-  scored opportunities (thumbnails, net profit, margin, flags). Zero-dep server.
+- **Web dashboard** — three tabs: **Scan** (run a search, tune thresholds, browse
+  scored cards), **Saved** (opportunities that passed, persisted across runs),
+  **Watch** (scheduled watchlists). Zero-dep server, binds to loopback.
+- **Watch / alert mode** — saved watchlists scanned on a schedule (`npm run
+  watch`), auto-saving new passing opportunities and printing alerts.
+- **Persistence** — zero-infra JSON store out of the box (saved feed +
+  watchlists); Prisma/Postgres schema included as the upgrade path.
 - **Craigslist source connector** — uses Craigslist's built-in RSS feed. No
   login, no headless browser. The lowest-friction first source.
-- **Facebook Marketplace source connector** — browser-driven (Playwright) with a
-  persistent logged-in session and **anti-detection hardening** (see below).
-  Optional dependency; the rest of the engine runs without it.
+- **Facebook Marketplace + OfferUp source connectors** — browser-driven
+  (Playwright) with **anti-detection hardening** (see below). Facebook uses a
+  persistent logged-in session; OfferUp browses public results. Optional
+  dependency; the rest of the engine runs without it.
 - **eBay comp connector** — real OAuth + Marketplace Insights request shape,
   with a mock-comps fallback so the pipeline runs before you're approved for
   sold-data access.
@@ -50,7 +56,25 @@ CLI equivalent:
 npm run run -- "nintendo switch" 150                  # craigslist (default)
 npm run run -- "nintendo switch" 150 --source=demo    # offline demo
 npm run run -- "nintendo switch" 150 --source=facebook
+npm run run -- "nintendo switch" 150 --source=offerup
+npm test                                              # node:test suite
 ```
+
+## Saved feed, watchlists & alerts
+
+Passing opportunities are persisted to a JSON store (`data/store.json`, gitignored;
+override with `STORE_FILE`) and surface under the dashboard's **Saved** tab.
+
+Create **watchlists** in the **Watch** tab (query + source + interval + the
+current threshold sliders), then run the scheduler:
+
+```bash
+npm run watch    # ticks every minute, runs due watchlists, alerts on new finds
+```
+
+It re-reads the store each tick, so watchlists you add/pause/edit in the
+dashboard take effect without a restart. For Postgres instead of the JSON store,
+set `DATABASE_URL` and `npm run prisma:push` (schema in `prisma/`).
 
 ## Facebook Marketplace (scrape-with-safeguards)
 
@@ -72,6 +96,10 @@ ToS** and risks account/IP bans — keep volume to personal-research scale.
 
 Config (env): `FACEBOOK_USER_DATA_DIR` (default `.fb-session`, gitignored),
 `FACEBOOK_MARKETPLACE_LOCATION` (e.g. `nyc`, `sfbay`), `FACEBOOK_HEADFUL`.
+
+**OfferUp** (`--source=offerup`) uses the same browser + stealth layer but needs
+no login (public search). Best-effort selectors; same ToS caveat and safeguards.
+Set `OFFERUP_HEADFUL=true` to watch it run.
 
 ## Wiring real data
 

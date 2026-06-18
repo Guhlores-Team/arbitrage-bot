@@ -16,12 +16,17 @@
     color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     min-height: 100vh;
   }
-  header { padding: 22px 28px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 14px; }
+  header { padding: 20px 28px 0; border-bottom: 1px solid var(--line); }
+  .top { display: flex; align-items: baseline; gap: 14px; }
   header h1 { font-size: 19px; margin: 0; letter-spacing: .2px; }
   header .tag { color: var(--muted); font-size: 13px; }
   .mode { margin-left: auto; font-size: 12px; color: var(--muted); }
-  .mode b { color: var(--warn); }
+  .tabs { display: flex; gap: 6px; margin-top: 16px; }
+  .tab { padding: 10px 16px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; font-size: 14px; }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab .count { font-size: 11px; color: var(--muted); background: var(--chip); border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
   main { max-width: 1180px; margin: 0 auto; padding: 24px 28px 64px; }
+  .view { display: none; } .view.active { display: block; }
 
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
   form.search { display: grid; grid-template-columns: 1fr 130px 150px auto; gap: 12px; align-items: end; }
@@ -36,6 +41,9 @@
     border-radius: 10px; padding: 12px 22px; font-weight: 600; font-size: 14px; height: 44px;
   }
   button.go:disabled { opacity: .6; cursor: default; }
+  button.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 9px; padding: 8px 14px; cursor: pointer; font-size: 13px; }
+  button.ghost:hover { border-color: var(--accent); }
+  button.danger { color: var(--bad); border-color: #4a2530; }
 
   details.tuning { margin-top: 14px; }
   details.tuning summary { cursor: pointer; color: var(--muted); font-size: 13px; }
@@ -43,23 +51,20 @@
   .sliders .val { color: var(--accent); font-variant-numeric: tabular-nums; }
   input[type=range] { padding: 0; accent-color: var(--accent); }
 
-  .summary { display: flex; gap: 22px; margin: 22px 2px 14px; color: var(--muted); font-size: 13px; align-items: center; }
+  .summary { display: flex; gap: 22px; margin: 22px 2px 14px; color: var(--muted); font-size: 13px; align-items: center; flex-wrap: wrap; }
   .summary b { color: var(--text); }
   .summary .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .summary .spacer { margin-left: auto; }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
   .card.pass { border-color: #2a5a45; }
   .card .thumb { height: 150px; background: #0d131d center/cover no-repeat; position: relative; }
-  .card .thumb .badge {
-    position: absolute; top: 10px; left: 10px; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
-  }
+  .card .thumb .badge { position: absolute; top: 10px; left: 10px; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
   .badge.pass { background: rgba(54,211,153,.18); color: var(--good); border: 1px solid rgba(54,211,153,.4); }
   .badge.fail { background: rgba(255,107,107,.15); color: var(--bad); border: 1px solid rgba(255,107,107,.4); }
-  .card .thumb .score {
-    position: absolute; bottom: 10px; right: 10px; width: 46px; height: 46px; border-radius: 50%;
-    display: grid; place-items: center; font-weight: 700; font-size: 14px; background: #0d131dcc; backdrop-filter: blur(3px);
-  }
+  .card .thumb .score { position: absolute; bottom: 10px; right: 10px; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; background: #0d131dcc; backdrop-filter: blur(3px); }
+  .card .thumb .src { position: absolute; top: 10px; right: 10px; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); background: #0d131dcc; padding: 3px 7px; border-radius: 6px; }
   .card .body { padding: 14px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
   .card .title { font-weight: 600; font-size: 14px; line-height: 1.35; }
   .card .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
@@ -72,95 +77,148 @@
   .chip { background: var(--chip); border: 1px solid var(--line); color: var(--muted); font-size: 11px; padding: 3px 8px; border-radius: 999px; }
   .chip.flag { color: var(--warn); border-color: #4a3f1f; background: #251f10; }
   .card .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
-  .card a.view { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
+  .card a.view-link { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
   .meterbar { height: 5px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
   .meterbar > span { display: block; height: 100%; background: linear-gradient(90deg, #2f7fe0, #5aa6ff); }
+
+  table.wl { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+  table.wl th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  table.wl td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  table.wl .actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .toggle { cursor: pointer; font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); }
+  .toggle.on { color: var(--good); border-color: rgba(54,211,153,.4); background: rgba(54,211,153,.12); }
+  .toggle.off { color: var(--muted); }
 
   .state { text-align: center; color: var(--muted); padding: 60px 0; }
   .spinner { width: 26px; height: 26px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 14px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .err { color: var(--bad); }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; font-size: 13px; box-shadow: 0 10px 30px #0008; opacity: 0; transform: translateY(8px); transition: .25s; }
+  .toast.show { opacity: 1; transform: none; }
   @media (max-width: 720px) { form.search { grid-template-columns: 1fr 1fr; } .sliders { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>⟳ Arbitrage Engine</h1>
-  <span class="tag">source → identify → comp → match → margin → score</span>
-  <span class="mode" id="mode"></span>
+  <div class="top">
+    <h1>⟳ Arbitrage Engine</h1>
+    <span class="tag">source → identify → comp → match → margin → score</span>
+    <span class="mode" id="mode"></span>
+  </div>
+  <nav class="tabs">
+    <div class="tab active" data-tab="scan">Scan</div>
+    <div class="tab" data-tab="saved">Saved <span class="count" id="savedCount">0</span></div>
+    <div class="tab" data-tab="watch">Watch <span class="count" id="watchCount">0</span></div>
+  </nav>
 </header>
 
 <main>
-  <section class="panel">
-    <form class="search" id="form">
-      <div>
-        <label for="q">What to hunt for</label>
-        <input id="q" placeholder="e.g. nintendo switch oled" value="nintendo switch" autocomplete="off" />
-      </div>
-      <div>
-        <label for="cap">Max buy price</label>
-        <input id="cap" type="number" min="0" placeholder="any" />
-      </div>
-      <div>
-        <label for="source">Source</label>
-        <select id="source"></select>
-      </div>
-      <button class="go" id="go" type="submit">Scan</button>
-    </form>
-
-    <details class="tuning">
-      <summary>Scoring thresholds</summary>
-      <div class="sliders">
-        <div>
-          <label>Min margin — <span class="val" id="mLbl"></span></label>
-          <input type="range" id="minMargin" min="0" max="0.8" step="0.05" />
+  <!-- SCAN -->
+  <section class="view active" id="view-scan">
+    <div class="panel">
+      <form class="search" id="form">
+        <div><label for="q">What to hunt for</label><input id="q" placeholder="e.g. nintendo switch oled" value="nintendo switch" autocomplete="off" /></div>
+        <div><label for="cap">Max buy price</label><input id="cap" type="number" min="0" placeholder="any" /></div>
+        <div><label for="source">Source</label><select id="source"></select></div>
+        <button class="go" id="go" type="submit">Scan</button>
+      </form>
+      <details class="tuning">
+        <summary>Scoring thresholds</summary>
+        <div class="sliders">
+          <div><label>Min margin — <span class="val" id="mLbl"></span></label><input type="range" id="minMargin" min="0" max="0.8" step="0.05" /></div>
+          <div><label>Min net profit — <span class="val" id="pLbl"></span></label><input type="range" id="minProfit" min="0" max="200" step="5" /></div>
+          <div><label>Min match confidence — <span class="val" id="cLbl"></span></label><input type="range" id="minConf" min="0" max="1" step="0.05" /></div>
         </div>
-        <div>
-          <label>Min net profit — <span class="val" id="pLbl"></span></label>
-          <input type="range" id="minProfit" min="0" max="200" step="5" />
-        </div>
-        <div>
-          <label>Min match confidence — <span class="val" id="cLbl"></span></label>
-          <input type="range" id="minConf" min="0" max="1" step="0.05" />
-        </div>
-      </div>
-    </details>
+      </details>
+    </div>
+    <div class="summary" id="summary" hidden></div>
+    <div id="results"></div>
   </section>
 
-  <div class="summary" id="summary" hidden></div>
-  <div id="results"></div>
+  <!-- SAVED -->
+  <section class="view" id="view-saved">
+    <div class="summary">
+      <span><span class="dot" style="background:var(--good)"></span>Opportunities that passed your thresholds, kept across scans &amp; watch runs.</span>
+      <span class="spacer"></span>
+      <button class="ghost" id="refreshSaved">Refresh</button>
+      <button class="ghost danger" id="clearSaved">Clear all</button>
+    </div>
+    <div id="savedResults"></div>
+  </section>
+
+  <!-- WATCH -->
+  <section class="view" id="view-watch">
+    <div class="panel">
+      <form class="search" id="wlForm">
+        <div><label for="wlQ">Watch query</label><input id="wlQ" placeholder="e.g. dyson v11" autocomplete="off" /></div>
+        <div><label for="wlCap">Max buy price</label><input id="wlCap" type="number" min="0" placeholder="any" /></div>
+        <div><label for="wlSource">Source</label><select id="wlSource"></select></div>
+        <button class="go" id="wlAdd" type="submit">+ Watch</button>
+      </form>
+      <div class="sliders" style="margin-top:14px">
+        <div><label>Interval — <span class="val" id="iLbl"></span></label><input type="range" id="wlInterval" min="5" max="240" step="5" value="30" /></div>
+        <div style="grid-column: span 2; color: var(--muted); font-size: 12px; align-self: end;">
+          Watchlists use the thresholds from the Scan tab when created. Run <code>npm run watch</code> to scan them on schedule, or hit ▷ to run one now.
+        </div>
+      </div>
+    </div>
+    <div id="wlList"></div>
+  </section>
 </main>
+<div class="toast" id="toast"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-let config = { thresholds: { minMarginPct: .25, minAbsoluteProfit: 20, minMatchConfidence: .8 } };
+let config = { sources: ["demo"], thresholds: { minMarginPct: .25, minAbsoluteProfit: 20, minMatchConfidence: .8 } };
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 2600);
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
+function scoreColor(s) { return s >= .66 ? "var(--good)" : s >= .4 ? "var(--warn)" : "var(--bad)"; }
+
+// --- tabs ---
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+  document.querySelectorAll(".view").forEach((x) => x.classList.remove("active"));
+  t.classList.add("active");
+  $("view-" + t.dataset.tab).classList.add("active");
+  if (t.dataset.tab === "saved") loadSaved();
+  if (t.dataset.tab === "watch") loadWatchlists();
+}));
 
 async function loadConfig() {
   config = await (await fetch("/api/config")).json();
-  const sel = $("source");
-  sel.innerHTML = config.sources.map((s) => `<option value="${s}">${s}</option>`).join("");
-  sel.value = config.sources.includes("demo") ? "demo" : config.sources[0];
-
+  const opts = config.sources.map((s) => `<option value="${s}">${s}</option>`).join("");
+  $("source").innerHTML = opts; $("wlSource").innerHTML = opts;
+  $("source").value = config.sources.includes("demo") ? "demo" : config.sources[0];
   $("minMargin").value = config.thresholds.minMarginPct;
   $("minProfit").value = config.thresholds.minAbsoluteProfit;
   $("minConf").value = config.thresholds.minMatchConfidence;
   syncLabels();
-
   const bits = [];
   bits.push(config.hasAnthropicKey ? "AI identify: <b style='color:var(--good)'>on</b>" : "AI identify: <b>offline heuristic</b>");
   bits.push(config.ebayMockComps ? "eBay comps: <b>mock</b>" : "eBay comps: <b style='color:var(--good)'>live</b>");
   $("mode").innerHTML = bits.join(" &nbsp;·&nbsp; ");
+  loadSaved(); loadWatchlists();
 }
-
 function syncLabels() {
   $("mLbl").textContent = Math.round($("minMargin").value * 100) + "%";
   $("pLbl").textContent = "$" + $("minProfit").value;
   $("cLbl").textContent = Math.round($("minConf").value * 100) + "%";
 }
 ["minMargin", "minProfit", "minConf"].forEach((id) => $(id).addEventListener("input", syncLabels));
+$("wlInterval").addEventListener("input", () => $("iLbl").textContent = $("wlInterval").value + " min");
+$("iLbl").textContent = "30 min";
 
-function scoreColor(s) { return s >= .66 ? "var(--good)" : s >= .4 ? "var(--warn)" : "var(--bad)"; }
-function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
+function thresholdsFromSliders() {
+  return {
+    minMarginPct: Number($("minMargin").value),
+    minAbsoluteProfit: Number($("minProfit").value),
+    minMatchConfidence: Number($("minConf").value),
+  };
+}
 
 function card(o) {
   const netCls = o.net >= 0 ? "net-pos" : "net-neg";
@@ -172,6 +230,7 @@ function card(o) {
   <div class="card ${o.passes ? "pass" : ""}">
     <div class="thumb" ${thumb}>
       <span class="badge ${o.passes ? "pass" : "fail"}">${o.passes ? "OPPORTUNITY" : "below bar"}</span>
+      ${o.source ? `<span class="src">${esc(o.source)}</span>` : ""}
       <span class="score" style="color:${scoreColor(o.score)}">${o.score.toFixed(2)}</span>
     </div>
     <div class="body">
@@ -194,12 +253,14 @@ function card(o) {
       ${flags ? `<div class="chips">${flags}</div>` : ""}
       <div class="foot">
         <span class="sub">${esc(o.condition)}</span>
-        <a class="view" href="${esc(o.url)}" target="_blank" rel="noopener">View listing →</a>
+        <a class="view-link" href="${esc(o.url)}" target="_blank" rel="noopener">View listing →</a>
       </div>
     </div>
   </div>`;
 }
+const gridify = (list, empty) => list.length ? `<div class="grid">${list.map(card).join("")}</div>` : `<div class="state">${empty}</div>`;
 
+// --- scan ---
 async function run(e) {
   e.preventDefault();
   const go = $("go"); go.disabled = true; go.textContent = "Scanning…";
@@ -208,40 +269,82 @@ async function run(e) {
   try {
     const res = await fetch("/api/search", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: $("q").value, source: $("source").value,
-        maxPrice: $("cap").value || undefined,
-        thresholds: {
-          minMarginPct: Number($("minMargin").value),
-          minAbsoluteProfit: Number($("minProfit").value),
-          minMatchConfidence: Number($("minConf").value),
-        },
-      }),
+      body: JSON.stringify({ query: $("q").value, source: $("source").value, maxPrice: $("cap").value || undefined, thresholds: thresholdsFromSliders() }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "request failed");
-    render(data);
+    const m = data.meta;
+    $("summary").hidden = false;
+    $("summary").innerHTML =
+      `<span><span class="dot" style="background:var(--good)"></span><b>${m.passing}</b> opportunities</span>` +
+      `<span><b>${m.count}</b> scanned</span><span>source <b>${esc(m.source)}</b></span><span>${m.tookMs} ms</span>`;
+    $("results").innerHTML = gridify(data.opportunities, "No results. Try a broader query or a different source.");
+    if (m.passing) { toast(`${m.passing} saved to feed`); loadSaved(); }
   } catch (err) {
     $("results").innerHTML = `<div class="state err">⚠ ${esc(err.message)}</div>`;
-  } finally {
-    go.disabled = false; go.textContent = "Scan";
-  }
+  } finally { go.disabled = false; go.textContent = "Scan"; }
 }
 
-function render(data) {
-  const m = data.meta;
-  $("summary").hidden = false;
-  $("summary").innerHTML =
-    `<span><span class="dot" style="background:var(--good)"></span><b>${m.passing}</b> opportunities</span>` +
-    `<span><b>${m.count}</b> scanned</span>` +
-    `<span>source <b>${esc(m.source)}</b></span>` +
-    `<span>${m.tookMs} ms</span>`;
-  if (!data.opportunities.length) {
-    $("results").innerHTML = `<div class="state">No results. Try a broader query or a different source.</div>`;
-    return;
-  }
-  $("results").innerHTML = `<div class="grid">${data.opportunities.map(card).join("")}</div>`;
+// --- saved ---
+async function loadSaved() {
+  const data = await (await fetch("/api/opportunities")).json();
+  $("savedCount").textContent = data.opportunities.length;
+  if ($("view-saved").classList.contains("active") || true)
+    $("savedResults").innerHTML = gridify(data.opportunities, "No saved opportunities yet. Run a scan that passes your thresholds.");
 }
+$("refreshSaved").addEventListener("click", loadSaved);
+$("clearSaved").addEventListener("click", async () => {
+  if (!confirm("Clear all saved opportunities?")) return;
+  await fetch("/api/opportunities", { method: "DELETE" });
+  toast("Saved feed cleared"); loadSaved();
+});
+
+// --- watchlists ---
+async function loadWatchlists() {
+  const data = await (await fetch("/api/watchlists")).json();
+  $("watchCount").textContent = data.watchlists.length;
+  const rows = data.watchlists.map((w) => `
+    <tr>
+      <td><b>${esc(w.query)}</b><div class="sub">${esc(w.source)}${w.maxPrice ? " · ≤$" + w.maxPrice : ""}</div></td>
+      <td>${w.intervalMin} min</td>
+      <td>${w.lastRunAt ? new Date(w.lastRunAt).toLocaleString() : "—"}</td>
+      <td>${w.lastFoundCount ?? "—"}</td>
+      <td><span class="toggle ${w.enabled ? "on" : "off"}" data-id="${w.id}" data-en="${w.enabled}">${w.enabled ? "● enabled" : "○ paused"}</span></td>
+      <td class="actions">
+        <button class="ghost" data-run="${w.id}">▷ Run</button>
+        <button class="ghost danger" data-del="${w.id}">Delete</button>
+      </td>
+    </tr>`).join("");
+  $("wlList").innerHTML = data.watchlists.length
+    ? `<table class="wl"><thead><tr><th>Query</th><th>Every</th><th>Last run</th><th>Found</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+    : `<div class="state">No watchlists. Add one above to scan on a schedule.</div>`;
+
+  $("wlList").querySelectorAll("[data-run]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true; b.textContent = "running…";
+    const r = await (await fetch(`/api/watchlists/${b.dataset.run}/run`, { method: "POST" })).json();
+    toast(r.error ? r.error : `${r.meta.passing} pass · ${r.newlySaved} new`);
+    loadWatchlists(); loadSaved();
+  }));
+  $("wlList").querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
+    await fetch(`/api/watchlists/${b.dataset.del}`, { method: "DELETE" }); toast("Removed"); loadWatchlists();
+  }));
+  $("wlList").querySelectorAll(".toggle").forEach((t) => t.addEventListener("click", async () => {
+    await fetch(`/api/watchlists/${t.dataset.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: t.dataset.en !== "true" }) });
+    loadWatchlists();
+  }));
+}
+$("wlForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = $("wlQ").value.trim();
+  if (!q) return toast("Enter a query to watch");
+  const r = await fetch("/api/watchlists", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: q, source: $("wlSource").value, maxPrice: $("wlCap").value || undefined, intervalMin: Number($("wlInterval").value), thresholds: thresholdsFromSliders() }),
+  });
+  const data = await r.json();
+  if (!r.ok) return toast(data.error || "failed");
+  $("wlQ").value = ""; toast("Watchlist added"); loadWatchlists();
+});
 
 $("form").addEventListener("submit", run);
 loadConfig();
