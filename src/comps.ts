@@ -2,12 +2,13 @@ import { EbayCompConnector } from "./connectors/ebay.js";
 import { PriceChartingConnector } from "./connectors/pricecharting.js";
 import { KeepaConnector } from "./connectors/keepa.js";
 import { StockXConnector } from "./connectors/stockx.js";
+import { SerpApiShoppingConnector } from "./connectors/serpapi.js";
 import { MultiCompConnector } from "./connectors/multicomp.js";
 import { RoutingCompConnector } from "./connectors/routing.js";
 import type { CompConnector } from "./connectors/connector.js";
 
 /** Comp markets the engine can value against. */
-export const COMP_MARKETS = ["ebay", "pricecharting", "keepa", "stockx"] as const;
+export const COMP_MARKETS = ["ebay", "pricecharting", "keepa", "stockx", "google"] as const;
 
 function makeComp(name: string): CompConnector | null {
   switch (name) {
@@ -20,6 +21,9 @@ function makeComp(name: string): CompConnector | null {
       return new KeepaConnector();
     case "stockx":
       return new StockXConnector();
+    case "google":
+    case "serpapi":
+      return new SerpApiShoppingConnector();
     default:
       return null;
   }
