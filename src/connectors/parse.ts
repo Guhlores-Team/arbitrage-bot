@@ -67,23 +67,33 @@ export function pickImage(src?: string, srcset?: string): string | undefined {
 }
 
 /**
- * Turn a raw card into structured fields. Heuristic but deterministic:
- *   price   = first $-bearing fragment ("Free" -> 0)
- *   title   = longest non-price, non-location fragment
- *   location= a "City, ST"-looking fragment, else the last short non-title text
+ * Title from an aria-label, handling both marketplace formats:
+ *   OfferUp:  "Title  $Price  in City, ST"
+ *   Facebook: "Title, $Price, City, ST, listing 123"
+ * In both, the title is everything before the price; trim any trailing comma.
  */
-/** "Title  $Price  in City, ST" -> title (everything before the price). */
 function titleFromAria(aria?: string): string | undefined {
   if (!aria) return undefined;
   const t = aria.replace(/\s+/g, " ").trim();
-  const cut = t.split(/\s+(?=\$|free\b)/i)[0].trim();
+  const cut = t.split(/,?\s+(?=\$|free\b)/i)[0].replace(/[,\s]+$/, "").trim();
   return cut || undefined;
 }
 
-/** "… in City, ST" -> "City, ST". */
+/** Facebook img alt is "Title in City, ST" — drop the trailing location. */
+function titleFromImgAlt(imgAlt?: string): string | undefined {
+  if (!imgAlt) return undefined;
+  return imgAlt.replace(/\s+in\s+[A-Za-z .'\-]+,\s*[A-Z]{2}\s*$/, "").trim() || undefined;
+}
+
+/** Location from an aria-label, in either marketplace format. */
 function locationFromAria(aria?: string): string | undefined {
-  const m = aria?.replace(/\s+/g, " ").match(/\bin\s+([A-Za-z .'\-]+,\s*[A-Z]{2})\s*$/);
-  return m ? m[1].trim() : undefined;
+  const t = aria?.replace(/\s+/g, " ");
+  // Facebook: "…, City, ST, listing 123"
+  const fb = t?.match(/,\s*([A-Za-z .'\-]+,\s*[A-Z]{2}),\s*listing\b/i);
+  if (fb) return fb[1].trim();
+  // OfferUp: "… in City, ST"
+  const ou = t?.match(/\bin\s+([A-Za-z .'\-]+,\s*[A-Z]{2})\b/);
+  return ou ? ou[1].trim() : undefined;
 }
 
 export function parseCard(raw: RawCard): ParsedCard {
@@ -99,17 +109,18 @@ export function parseCard(raw: RawCard): ParsedCard {
     }
   }
 
-  // Title: prefer the clean structured signals (img alt, aria-label), then a
-  // span with no "$" in it (the concatenated blob always contains the merged
-  // price, so excluding "$" drops it), then a leading-price strip as last resort.
+  // Title: prefer the structured aria-label (cleanest, both marketplaces), then
+  // a de-located img alt, then a span with no "$" (the concatenated blob always
+  // contains the merged price, so excluding "$" drops it), then a leading-price
+  // strip as last resort.
   const cleanSpans = texts.filter((t) => !t.includes("$") && !looksLikeLocation(t));
   const blobTitle = (() => {
     const blob = texts.find((t) => LEADING_PRICE.test(t));
     return blob?.replace(LEADING_PRICE, "").trim();
   })();
   const title = (
-    (raw.imgAlt && raw.imgAlt.trim()) ||
     titleFromAria(raw.ariaLabel) ||
+    titleFromImgAlt(raw.imgAlt) ||
     cleanSpans.sort((a, b) => b.length - a.length)[0] ||
     blobTitle ||
     texts[0] ||

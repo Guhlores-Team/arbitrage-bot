@@ -74,3 +74,32 @@ test("parseCard derives title + location from aria-label when no img alt", () =>
   assert.equal(c.price, 450);
   assert.equal(c.location, "Omaha, NE");
 });
+
+// Real logged-in Facebook Marketplace card shapes (aria = "Title, $Price, City, ST, listing <id>";
+// img alt = "Title in City, ST"; spans repeat each field).
+test("parseCard handles Facebook aria-label format", () => {
+  const c = parseCard({
+    id: "1376440694354695",
+    url: "https://www.facebook.com/marketplace/item/1376440694354695/",
+    ariaLabel: "Nintendo Switch Bundle, $150, Brooklyn, NY, listing 1376440694354695",
+    imgAlt: "Nintendo Switch Bundle in Brooklyn, NY",
+    texts: ["$150", "$150", "Nintendo Switch Bundle", "Nintendo Switch Bundle", "Brooklyn, NY", "Brooklyn, NY"],
+  });
+  assert.equal(c.title, "Nintendo Switch Bundle"); // no trailing comma, no " in Brooklyn, NY"
+  assert.equal(c.price, 150);
+  assert.equal(c.location, "Brooklyn, NY");
+});
+
+test("parseCard keeps a long Facebook title intact (canonical code preserved)", () => {
+  const c = parseCard({
+    id: "2234863793940852",
+    url: "u",
+    ariaLabel: "Nintendo Switch HAC-001 Console Gray With All Original Accessories, $150, New York, NY, listing 2234863793940852",
+    imgAlt: "Nintendo Switch HAC-001 Console Gray With All Original Accessories in New York, NY",
+    texts: ["$150", "Nintendo Switch HAC-001 Console Gray With All Original Accessories", "New York, NY"],
+  });
+  assert.match(c.title, /HAC-001/);
+  assert.ok(!/New York/.test(c.title)); // location stripped from the title
+  assert.equal(c.location, "New York, NY");
+  assert.equal(c.price, 150);
+});
