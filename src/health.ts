@@ -44,6 +44,11 @@ export async function health() {
       ready: playwright,
       note: playwright ? "ready (public browse)" : "install Playwright",
     },
+    {
+      source: "shopgoodwill",
+      ready: true,
+      note: "JSON API — no browser needed" + proxyNote,
+    },
   ];
 
   const comps = compInfo();

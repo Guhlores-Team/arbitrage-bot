@@ -1,10 +1,11 @@
 import { EbayCompConnector } from "./connectors/ebay.js";
 import { PriceChartingConnector } from "./connectors/pricecharting.js";
+import { KeepaConnector } from "./connectors/keepa.js";
 import { MultiCompConnector } from "./connectors/multicomp.js";
 import type { CompConnector } from "./connectors/connector.js";
 
 /** Comp markets the engine can value against. */
-export const COMP_MARKETS = ["ebay", "pricecharting"] as const;
+export const COMP_MARKETS = ["ebay", "pricecharting", "keepa"] as const;
 
 function makeComp(name: string): CompConnector | null {
   switch (name) {
@@ -12,6 +13,9 @@ function makeComp(name: string): CompConnector | null {
       return new EbayCompConnector();
     case "pricecharting":
       return new PriceChartingConnector();
+    case "keepa":
+    case "amazon":
+      return new KeepaConnector();
     default:
       return null;
   }

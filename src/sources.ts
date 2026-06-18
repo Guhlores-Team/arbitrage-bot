@@ -2,12 +2,13 @@ import { CraigslistConnector } from "./connectors/craigslist.js";
 import { FacebookConnector } from "./connectors/facebook.js";
 import { OfferUpConnector } from "./connectors/offerup.js";
 import { MercariConnector } from "./connectors/mercari.js";
+import { ShopGoodwillConnector } from "./connectors/shopgoodwill.js";
 import { MockSourceConnector } from "./connectors/mock.js";
 import { MultiSourceConnector } from "./connectors/multi.js";
 import type { SourceConnector } from "./connectors/connector.js";
 
 /** Source connectors the CLI and dashboard can select by name. */
-export const SOURCES = ["demo", "craigslist", "facebook", "offerup", "mercari"] as const;
+export const SOURCES = ["demo", "craigslist", "facebook", "offerup", "mercari", "shopgoodwill"] as const;
 export type SourceName = (typeof SOURCES)[number];
 
 /** Real (non-demo) local marketplaces — what "all" sweeps across. */
@@ -21,6 +22,8 @@ export function pickSource(name: string): SourceConnector {
       return new OfferUpConnector();
     case "mercari":
       return new MercariConnector();
+    case "shopgoodwill":
+      return new ShopGoodwillConnector();
     case "craigslist":
       return new CraigslistConnector();
     case "demo":

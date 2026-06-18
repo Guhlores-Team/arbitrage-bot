@@ -9,7 +9,7 @@ export type Condition =
   | "for_parts"
   | "unknown";
 
-export type Source = "craigslist" | "ebay" | "facebook" | "offerup" | "mercari" | "demo";
+export type Source = "craigslist" | "ebay" | "facebook" | "offerup" | "mercari" | "shopgoodwill" | "demo";
 
 /** A raw listing as pulled from a SOURCE marketplace (the place you buy from). */
 export interface SourceListing {

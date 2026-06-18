@@ -293,6 +293,17 @@ function json(res: any, status: number, payload: unknown) {
   res.end(JSON.stringify(payload));
 }
 
+server.on("error", (err: any) => {
+  if (err?.code === "EADDRINUSE") {
+    console.error(
+      `\n  Port ${PORT} is already in use — another instance is running.\n` +
+        `  Stop it first:  fuser -k ${PORT}/tcp   (or change PORT in .env)\n`,
+    );
+    process.exit(1);
+  }
+  throw err;
+});
+
 server.listen(PORT, HOST, () => {
   console.log(`\n  Arbitrage dashboard → http://${HOST}:${PORT}`);
   if (!llmInfo().configured) {
