@@ -94,6 +94,16 @@ const server = createServer(async (req, res) => {
       }
     }
 
+    if (method === "GET" && path === "/api/stats") {
+      return json(res, 200, await store.outcomeStats());
+    }
+
+    const oppMatch = path.match(/^\/api\/opportunities\/([\w-]+)$/);
+    if (oppMatch && method === "PATCH") {
+      const o = await store.setOpportunityOutcome(oppMatch[1], await readBody(req));
+      return o ? json(res, 200, { opportunity: o }) : json(res, 404, { error: "not found" });
+    }
+
     if (path === "/api/watchlists") {
       if (method === "GET") return json(res, 200, { watchlists: await store.listWatchlists() });
       if (method === "POST") return await handleCreateWatchlist(res, await readBody(req));

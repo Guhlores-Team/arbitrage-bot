@@ -119,6 +119,11 @@
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: var(--surface-2); color: var(--ink-2); font-family: var(--mono); }
   .chip.flag { color: var(--warn); background: #241d10; }
+  .chip.st-sold { color: var(--profit); background: #11261f; }
+  .chip.st-bought { color: var(--warn); background: #241d10; }
+  .chip.st-skipped, .chip.st-new { color: var(--ink-3); }
+  .acts { display: flex; gap: 6px; margin-top: 2px; }
+  .acts button { flex: 1; padding: 6px 0; }
   .card .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
   .card .foot .view-link { font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
 
@@ -389,6 +394,14 @@ function card(o) {
       </div>
       ${(o.markets && o.markets.length) ? `<div class="chips">${o.markets.map((m) => `<span class="chip">${esc(m.market)} ${m.count}·$${m.median}</span>`).join("")}</div>` : ""}
       ${flags ? `<div class="chips">${flags}</div>` : ""}
+      ${o.status ? `<div class="chips">
+        <span class="chip st-${o.status}">${o.status}${o.actualProfit != null ? ` · P/L $${o.actualProfit}` : ""}</span>
+      </div>
+      <div class="acts">
+        <button class="ghost" data-act="bought" data-id="${esc(o.id)}">Bought</button>
+        <button class="ghost" data-act="sold" data-id="${esc(o.id)}">Sold</button>
+        <button class="ghost" data-act="skipped" data-id="${esc(o.id)}">Skip</button>
+      </div>` : ""}
       <div class="foot"><span class="muted">${esc(o.condition)}</span><a class="view-link" href="${esc(o.url)}" target="_blank" rel="noopener">View ↗</a></div>
     </div>
   </div>`;
@@ -448,14 +461,53 @@ async function run(e) {
 
 const savedState = { search: "", source: "all", sort: "score", passOnly: false };
 function renderSaved() {
-  $("savedStats").innerHTML = statsBar(savedList);
-  const head = `<div class="toolbar"><span class="muted">Saved across scans &amp; watch runs.</span><span class="right"><button class="ghost" id="refreshSaved">Refresh</button><button class="ghost danger" id="clearSaved">Clear all</button></span></div>`;
+  $("savedStats").innerHTML = statsBar(savedList) + ledgerBar(savedList);
+  const head = `<div class="toolbar"><span class="muted">Saved across scans &amp; watch runs. Mark deals Bought/Sold to track real P/L.</span><span class="right"><button class="ghost" id="refreshSaved">Refresh</button><button class="ghost danger" id="clearSaved">Clear all</button></span></div>`;
   $("savedToolbar").innerHTML = head + (savedList.length ? makeToolbar("saved", savedState, config.sources) : "");
   const filtered = applyToolbar(savedList, savedState);
   $("savedResults").innerHTML = gridify(filtered, savedList.length ? "Nothing matches your filters." : "No saved opportunities yet. Run a scan that clears your thresholds.");
   $("refreshSaved").addEventListener("click", loadSaved);
   $("clearSaved").addEventListener("click", async () => { if (!confirm("Clear all saved opportunities?")) return; await fetch("/api/opportunities", { method: "DELETE" }); toast("Cleared"); loadSaved(); });
+  $("savedResults").querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => oppAction(b.dataset.id, b.dataset.act)));
   if (savedList.length) { wireToolbar("saved", savedState, renderSaved); $("savedCount").textContent = savedList.length; }
+}
+
+function ledgerBar(list) {
+  const sold = list.filter((o) => o.status === "sold");
+  const realized = sold.reduce((s, o) => s + (o.actualProfit || 0), 0);
+  const holding = list.filter((o) => o.status === "bought").length;
+  if (!sold.length && !holding) return "";
+  const cls = realized >= 0 ? "profit" : "";
+  return `<div class="stats" style="grid-template-columns:repeat(3,1fr);margin-top:0">
+    <div class="stat"><div class="k">Realized P/L</div><div class="v ${cls}">$${fmt(realized)}</div></div>
+    <div class="stat"><div class="k">Sold</div><div class="v">${sold.length}</div></div>
+    <div class="stat"><div class="k">Holding (bought)</div><div class="v">${holding}</div></div>
+  </div>`;
+}
+
+async function oppAction(id, act) {
+  const o = savedList.find((x) => x.id === id) || {};
+  const body = { status: act };
+  if (act === "bought") {
+    const p = prompt("Buy price you paid ($):", o.buy || "");
+    if (p === null) return;
+    body.boughtPrice = Number(p);
+  }
+  if (act === "sold") {
+    if (o.boughtPrice == null) {
+      const b = prompt("What did you pay for it ($)?", o.buy || "");
+      if (b === null) return;
+      body.boughtPrice = Number(b);
+    }
+    const s = prompt("Sale price ($):", o.resale || "");
+    if (s === null) return;
+    body.soldPrice = Number(s);
+  }
+  const r = await fetch(`/api/opportunities/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const d = await r.json();
+  if (!r.ok) return toast(d.error || "failed");
+  toast(act === "sold" && d.opportunity?.actualProfit != null ? `Sold · P/L $${d.opportunity.actualProfit}` : act);
+  loadSaved();
 }
 async function loadSaved() {
   const data = await (await fetch("/api/opportunities")).json();

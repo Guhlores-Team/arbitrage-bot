@@ -29,6 +29,13 @@ export interface OpportunityView {
   source?: string;
   query?: string;
   savedAt?: string;
+  /** outcome tracking (feedback loop) */
+  status?: "new" | "bought" | "sold" | "skipped";
+  boughtPrice?: number;
+  soldPrice?: number;
+  actualProfit?: number;
+  statusAt?: string;
+  notes?: string;
 }
 
 export function toOpportunityView(o: Opportunity): OpportunityView {

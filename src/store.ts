@@ -102,8 +102,21 @@ export class JsonStore {
     const byId = new Map(this.data.opportunities.map((o) => [o.id, o]));
     const added: OpportunityView[] = [];
     for (const o of opps) {
-      const tagged = { ...o, source: meta.source, query: meta.query, savedAt: now };
-      if (!byId.has(o.id)) added.push(tagged);
+      const prev = byId.get(o.id);
+      // Re-scans refresh prices but must NOT wipe a tracked outcome.
+      const tagged: OpportunityView = {
+        ...o,
+        source: meta.source,
+        query: meta.query,
+        savedAt: now,
+        status: prev?.status ?? "new",
+        boughtPrice: prev?.boughtPrice,
+        soldPrice: prev?.soldPrice,
+        actualProfit: prev?.actualProfit,
+        statusAt: prev?.statusAt,
+        notes: prev?.notes,
+      };
+      if (!prev) added.push(tagged);
       byId.set(o.id, tagged);
     }
     this.data.opportunities = [...byId.values()]
@@ -117,6 +130,48 @@ export class JsonStore {
     await this.load();
     const list = opts.passingOnly ? this.data.opportunities.filter((o) => o.passes) : this.data.opportunities;
     return [...list].sort((a, b) => b.score - a.score);
+  }
+
+  /** Record a buy/sell/skip outcome on a saved opportunity (the feedback loop). */
+  async setOpportunityOutcome(
+    id: string,
+    patch: { status?: string; boughtPrice?: number; soldPrice?: number; notes?: string },
+  ): Promise<OpportunityView | undefined> {
+    await this.load();
+    const o = this.data.opportunities.find((x) => x.id === id);
+    if (!o) return undefined;
+    if (patch.status) o.status = patch.status as OpportunityView["status"];
+    if (patch.boughtPrice != null) o.boughtPrice = Number(patch.boughtPrice);
+    if (patch.soldPrice != null) o.soldPrice = Number(patch.soldPrice);
+    if (patch.notes != null) o.notes = String(patch.notes);
+    // realized profit once we know both ends (sale minus what you paid)
+    if (o.soldPrice != null && o.boughtPrice != null) o.actualProfit = Math.round(o.soldPrice - o.boughtPrice);
+    o.statusAt = new Date().toISOString();
+    await this.flush();
+    return o;
+  }
+
+  /** Aggregate realized performance — what's actually paying. */
+  async outcomeStats() {
+    await this.load();
+    const os = this.data.opportunities;
+    const by = (s: string) => os.filter((o) => o.status === s);
+    const sold = by("sold");
+    const realized = sold.reduce((sum, o) => sum + (o.actualProfit ?? 0), 0);
+    const wins = sold.filter((o) => (o.actualProfit ?? 0) > 0).length;
+    const bySource: Record<string, { sold: number; profit: number }> = {};
+    for (const o of sold) {
+      const k = o.source ?? "?";
+      (bySource[k] ??= { sold: 0, profit: 0 });
+      bySource[k].sold++;
+      bySource[k].profit += o.actualProfit ?? 0;
+    }
+    return {
+      counts: { new: by("new").length, bought: by("bought").length, sold: sold.length, skipped: by("skipped").length },
+      realizedProfit: realized,
+      winRate: sold.length ? wins / sold.length : 0,
+      bySource: Object.entries(bySource).map(([source, v]) => ({ source, ...v })).sort((a, b) => b.profit - a.profit),
+    };
   }
 
   async clearOpportunities(): Promise<void> {
