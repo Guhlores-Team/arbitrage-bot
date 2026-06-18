@@ -131,6 +131,18 @@ It re-reads the store each tick, so watchlists you add/pause/edit in the
 dashboard take effect without a restart. For Postgres instead of the JSON store,
 set `DATABASE_URL` and `npm run prisma:push` (schema in `prisma/`).
 
+## Discovery sweeps (always hunting the next flip)
+
+Watchlists are your fixed money-makers. **Sweeps** are the discovery loop: a
+labelled list of broad keywords the watch runner rotates through round-robin
+(a few per cycle, by `perTick`), so the engine constantly cross-references new
+categories against eBay instead of only the items you named. Create them in the
+dashboard's **Discover** tab (or load the 25-keyword starter pack), and the same
+`npm run watch` / `npm run serve` process cycles them on their interval —
+profitable finds auto-save + alert, deduped. Cost stays bounded: it runs
+`perTick` keywords per interval and advances a cursor, cycling the whole list
+over time rather than scanning everything at once.
+
 **Push alerts** — the watch runner (and the dashboard's "run now") send new finds
 to any configured channel; nothing configured = console only. Test from the
 **Settings** tab. Env:

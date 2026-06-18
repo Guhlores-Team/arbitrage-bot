@@ -12,6 +12,7 @@ import { EbayCompConnector } from "./connectors/ebay.js";
 import { health } from "./health.js";
 import { llmInfo } from "./llm.js";
 import { startWatch } from "./watch.js";
+import { STARTER_KEYWORDS } from "./sweep.js";
 
 /**
  * Dashboard server. Zero external deps — Node's http only — so it starts with
@@ -112,6 +113,27 @@ const server = createServer(async (req, res) => {
       }
     }
 
+    if (path === "/api/sweeps") {
+      if (method === "GET")
+        return json(res, 200, { sweeps: await store.listSweeps(), starterKeywords: STARTER_KEYWORDS });
+      if (method === "POST") return await handleCreateSweep(res, await readBody(req));
+    }
+
+    const swMatch = path.match(/^\/api\/sweeps\/([\w-]+)(\/run)?$/);
+    if (swMatch) {
+      const id = swMatch[1];
+      const runNow = Boolean(swMatch[2]);
+      if (method === "POST" && runNow) return await handleRunSweep(res, id);
+      if (method === "PATCH") {
+        const sw = await store.updateSweep(id, await readBody(req));
+        return sw ? json(res, 200, { sweep: sw }) : json(res, 404, { error: "not found" });
+      }
+      if (method === "DELETE") {
+        const ok = await store.removeSweep(id);
+        return ok ? json(res, 200, { ok: true }) : json(res, 404, { error: "not found" });
+      }
+    }
+
     if (method === "GET") return await serveStatic(res, path);
     return json(res, 405, { error: "method not allowed" });
   } catch (err: any) {
@@ -157,6 +179,59 @@ async function handleRunWatchlist(res: any, id: string) {
   await store.updateWatchlist(id, { lastRunAt: new Date().toISOString(), lastFoundCount: passing.length });
   if (added.length) await notifyOpportunities({ source: wl.source, query: wl.query }, added);
   return json(res, 200, { meta: result.meta, newlySaved: added.length });
+}
+
+async function handleCreateSweep(res: any, body: any) {
+  const keywords = Array.isArray(body?.keywords)
+    ? body.keywords.map((k: any) => String(k).trim()).filter(Boolean)
+    : String(body?.keywords ?? "")
+        .split(/[\n,]/)
+        .map((k) => k.trim())
+        .filter(Boolean);
+  if (!keywords.length) return json(res, 400, { error: "keywords are required" });
+  const source = String(body?.source ?? "demo");
+  if (!SOURCES.includes(source as any)) return json(res, 400, { error: `unknown source "${source}"` });
+
+  const sweep = await store.addSweep({
+    label: String(body?.label ?? "Discovery").slice(0, 60),
+    keywords,
+    source,
+    maxPrice: body?.maxPrice ? Number(body.maxPrice) : undefined,
+    thresholds: body?.thresholds
+      ? {
+          minMarginPct: Number(body.thresholds.minMarginPct ?? THRESHOLDS.minMarginPct),
+          minAbsoluteProfit: Number(body.thresholds.minAbsoluteProfit ?? THRESHOLDS.minAbsoluteProfit),
+          minMatchConfidence: Number(body.thresholds.minMatchConfidence ?? THRESHOLDS.minMatchConfidence),
+        }
+      : undefined,
+    intervalMin: Math.max(1, Number(body?.intervalMin ?? 30)),
+    perTick: Math.max(1, Number(body?.perTick ?? 2)),
+  });
+  return json(res, 201, { sweep });
+}
+
+async function handleRunSweep(res: any, id: string) {
+  const sw = (await store.listSweeps()).find((s) => s.id === id);
+  if (!sw) return json(res, 404, { error: "not found" });
+  const { pickSweepBatch } = await import("./sweep.js");
+  const { batch, nextCursor } = pickSweepBatch(sw.keywords, sw.cursor, sw.perTick);
+  let newlySaved = 0;
+  for (const query of batch) {
+    const result = await serialize(() =>
+      runScan({ query, source: sw.source, maxPrice: sw.maxPrice, thresholds: sw.thresholds }),
+    );
+    const passing = result.opportunities.filter((o) => o.passes);
+    const added = passing.length ? await store.saveOpportunities(passing, { source: sw.source, query }) : [];
+    newlySaved += added.length;
+    if (added.length) await notifyOpportunities({ source: `${sw.source} · sweep`, query }, added);
+  }
+  await store.updateSweep(id, {
+    cursor: nextCursor,
+    lastRunAt: new Date().toISOString(),
+    lastKeyword: batch[batch.length - 1],
+    totalFound: (sw.totalFound ?? 0) + newlySaved,
+  });
+  return json(res, 200, { ran: batch, newlySaved });
 }
 
 async function serveStatic(res: any, pathname: string) {

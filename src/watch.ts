@@ -1,7 +1,8 @@
 import "./env.js";
-import { store, type Watchlist } from "./store.js";
+import { store, type Watchlist, type Sweep } from "./store.js";
 import { runScan } from "./scan.js";
 import { notifyOpportunities, notifierStatus } from "./notify.js";
+import { pickSweepBatch } from "./sweep.js";
 
 /**
  * Watch runner: periodically runs each enabled watchlist, saves passing
@@ -31,9 +32,40 @@ async function tick(): Promise<void> {
       const dueAt = wl.lastRunAt ? new Date(wl.lastRunAt).getTime() + wl.intervalMin * 60_000 : 0;
       if (now >= dueAt) await runOne(wl);
     }
+    for (const sw of await store.listSweeps()) {
+      if (!sw.enabled) continue;
+      const dueAt = sw.lastRunAt ? new Date(sw.lastRunAt).getTime() + sw.intervalMin * 60_000 : 0;
+      if (now >= dueAt) await runSweep(sw);
+    }
   } finally {
     ticking = false;
   }
+}
+
+/** Run the next round-robin batch of a sweep's keywords against the source + eBay. */
+async function runSweep(sw: Sweep): Promise<void> {
+  const { batch, nextCursor } = pickSweepBatch(sw.keywords, sw.cursor, sw.perTick);
+  if (!batch.length) return;
+  let found = 0;
+  for (const query of batch) {
+    const tag = `[sweep:${sw.label}] "${query}"`;
+    try {
+      const res = await runScan({ query, source: sw.source, maxPrice: sw.maxPrice, thresholds: sw.thresholds });
+      const passing = res.opportunities.filter((o) => o.passes);
+      const added = passing.length ? await store.saveOpportunities(passing, { source: sw.source, query }) : [];
+      found += added.length;
+      console.log(`${new Date().toLocaleTimeString()}  ${tag}: ${res.meta.count} scanned, ${passing.length} pass, ${added.length} new`);
+      if (added.length) await notifyOpportunities({ source: `${sw.source} · sweep`, query }, added);
+    } catch (err: any) {
+      console.error(`${new Date().toLocaleTimeString()}  ${tag}: ERROR ${err?.message ?? err}`);
+    }
+  }
+  await store.updateSweep(sw.id, {
+    cursor: nextCursor,
+    lastRunAt: new Date().toISOString(),
+    lastKeyword: batch[batch.length - 1],
+    totalFound: (sw.totalFound ?? 0) + found,
+  });
 }
 
 /**
@@ -45,9 +77,13 @@ export async function startWatch(): Promise<void> {
   if (started) return;
   started = true;
   const wls = await store.listWatchlists();
+  const sweeps = await store.listSweeps();
   const n = notifierStatus();
   const channels = [n.telegram && "Telegram", n.webhook && "webhook"].filter(Boolean).join(" + ") || "console only";
-  console.log(`  Watch runner active — ${wls.filter((w) => w.enabled).length} enabled watchlist(s). Alerts: ${channels}.`);
+  console.log(
+    `  Watch runner active — ${wls.filter((w) => w.enabled).length} watchlist(s), ` +
+      `${sweeps.filter((s) => s.enabled).length} sweep(s). Alerts: ${channels}.`,
+  );
   await tick();
   setInterval(tick, TICK_MS);
 }

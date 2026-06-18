@@ -25,15 +25,40 @@ export interface Watchlist {
   lastFoundCount?: number;
 }
 
+/**
+ * A discovery sweep: a rotating list of broad keywords the watch loop cycles
+ * through (round-robin, a few per tick) so the engine is always hunting the
+ * "next thing" instead of only your fixed money-makers.
+ */
+export interface Sweep {
+  id: string;
+  label: string;
+  keywords: string[];
+  source: string;
+  maxPrice?: number;
+  thresholds?: { minMarginPct: number; minAbsoluteProfit: number; minMatchConfidence: number };
+  intervalMin: number;
+  /** how many keywords to run each due interval (round-robin) */
+  perTick: number;
+  /** rotation position into keywords */
+  cursor: number;
+  enabled: boolean;
+  createdAt: string;
+  lastRunAt?: string;
+  lastKeyword?: string;
+  totalFound?: number;
+}
+
 interface StoreData {
   opportunities: OpportunityView[];
   watchlists: Watchlist[];
+  sweeps: Sweep[];
 }
 
 const MAX_OPPORTUNITIES = 1000;
 
 export class JsonStore {
-  private data: StoreData = { opportunities: [], watchlists: [] };
+  private data: StoreData = { opportunities: [], watchlists: [], sweeps: [] };
   private loaded = false;
 
   constructor(private file = process.env.STORE_FILE ?? join("data", "store.json")) {}
@@ -46,9 +71,10 @@ export class JsonStore {
       this.data = {
         opportunities: Array.isArray(parsed.opportunities) ? parsed.opportunities : [],
         watchlists: Array.isArray(parsed.watchlists) ? parsed.watchlists : [],
+        sweeps: Array.isArray(parsed.sweeps) ? parsed.sweeps : [],
       };
     } catch {
-      this.data = { opportunities: [], watchlists: [] }; // fresh store
+      this.data = { opportunities: [], watchlists: [], sweeps: [] }; // fresh store
     }
     this.loaded = true;
   }
@@ -133,6 +159,49 @@ export class JsonStore {
     const before = this.data.watchlists.length;
     this.data.watchlists = this.data.watchlists.filter((w) => w.id !== id);
     const removed = this.data.watchlists.length < before;
+    if (removed) await this.flush();
+    return removed;
+  }
+
+  // --- sweeps (discovery loop) ---
+
+  async listSweeps(): Promise<Sweep[]> {
+    await this.load();
+    return [...this.data.sweeps];
+  }
+
+  async addSweep(
+    s: Omit<Sweep, "id" | "createdAt" | "enabled" | "cursor"> & { enabled?: boolean },
+  ): Promise<Sweep> {
+    await this.load();
+    const sweep: Sweep = {
+      ...s,
+      keywords: s.keywords.map((k) => k.trim()).filter(Boolean),
+      perTick: Math.max(1, s.perTick || 1),
+      cursor: 0,
+      id: `sw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+      enabled: s.enabled ?? true,
+      createdAt: new Date().toISOString(),
+    };
+    this.data.sweeps.push(sweep);
+    await this.flush();
+    return sweep;
+  }
+
+  async updateSweep(id: string, patch: Partial<Sweep>): Promise<Sweep | undefined> {
+    await this.load();
+    const sw = this.data.sweeps.find((s) => s.id === id);
+    if (!sw) return undefined;
+    Object.assign(sw, patch);
+    await this.flush();
+    return sw;
+  }
+
+  async removeSweep(id: string): Promise<boolean> {
+    await this.load();
+    const before = this.data.sweeps.length;
+    this.data.sweeps = this.data.sweeps.filter((s) => s.id !== id);
+    const removed = this.data.sweeps.length < before;
     if (removed) await this.flush();
     return removed;
   }

@@ -183,6 +183,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
         Watch <span class="count" id="watchCount">0</span>
       </div>
+      <div class="tab" data-tab="discover">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/><circle cx="12" cy="12" r="4"/></svg>
+        Discover <span class="count" id="sweepCount">0</span>
+      </div>
       <div class="tab" data-tab="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.2A1.6 1.6 0 0 0 6.6 19l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 13.6H3a2 2 0 1 1 0-4h.2A1.6 1.6 0 0 0 4.6 7l-.1-.1A2 2 0 1 1 7.3 4l.1.1A1.6 1.6 0 0 0 9 4.6V4a2 2 0 1 1 4 0v.2A1.6 1.6 0 0 0 17.4 6l.1-.1A2 2 0 1 1 20.3 8l-.1.1A1.6 1.6 0 0 0 19.4 9H21a2 2 0 1 1 0 4h-.2"/></svg>
         Settings
@@ -244,6 +248,31 @@
         <div id="wlList" style="margin-top:14px"></div>
       </section>
 
+      <!-- DISCOVER -->
+      <section class="view" id="view-discover">
+        <div class="panel">
+          <form class="search" id="swForm" style="grid-template-columns: 1fr 132px 156px auto;">
+            <div><label for="swLabel">Sweep name</label><input id="swLabel" placeholder="e.g. Electronics flips" value="Electronics flips" autocomplete="off" /></div>
+            <div><label for="swCap">Max buy $</label><input id="swCap" type="number" min="0" placeholder="any" /></div>
+            <div><label for="swSource">Source</label><select id="swSource"></select></div>
+            <button class="go" id="swAdd" type="submit">Create</button>
+          </form>
+          <div style="margin-top:14px">
+            <label for="swKeywords">Keywords to rotate through (one per line or comma-separated)</label>
+            <textarea id="swKeywords" rows="5" style="width:100%; background:var(--bg); border:1px solid var(--line-2); color:var(--ink); border-radius:10px; padding:11px 12px; font-size:13px; font-family:var(--mono); outline:none;" placeholder="nintendo switch&#10;dyson vacuum&#10;dewalt drill"></textarea>
+            <div style="margin-top:8px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <button class="ghost" id="swStarter" type="button">Load starter pack</button>
+              <span class="muted">Interval</span>
+              <input id="swInterval" type="number" min="5" value="30" style="width:80px"/>
+              <span class="muted">min · run</span>
+              <input id="swPerTick" type="number" min="1" value="2" style="width:64px"/>
+              <span class="muted">keyword(s) per cycle. Uses the Scan tab's thresholds.</span>
+            </div>
+          </div>
+        </div>
+        <div id="swList" style="margin-top:14px"></div>
+      </section>
+
       <!-- SETTINGS -->
       <section class="view" id="view-settings">
         <div class="cols">
@@ -270,7 +299,7 @@
 const $ = (id) => document.getElementById(id);
 let config = { sources: ["demo"], thresholds: { minMarginPct: .25, minAbsoluteProfit: 20, minMatchConfidence: .8 }, notifiers: { any: false } };
 let lastScan = [], savedList = [];
-const CRUMBS = { scan: "find underpriced inventory · comp it on eBay · net out fees", saved: "opportunities that cleared your thresholds", watch: "scheduled scans with push alerts", settings: "keys, sources & alert channels" };
+const CRUMBS = { scan: "find underpriced inventory · comp it on eBay · net out fees", saved: "opportunities that cleared your thresholds", watch: "scheduled scans with push alerts", discover: "rotate broad categories — always hunting the next flip", settings: "keys, sources & alert channels" };
 
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 2800); }
 function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
@@ -287,14 +316,16 @@ document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () 
   $("viewCrumb").textContent = CRUMBS[tab] || "";
   if (tab === "saved") loadSaved();
   if (tab === "watch") loadWatchlists();
+  if (tab === "discover") loadSweeps();
   if (tab === "settings") renderSettings();
 }));
 
 async function loadConfig() {
   config = await (await fetch("/api/config")).json();
   const opts = config.sources.map((s) => `<option value="${s}">${s}</option>`).join("");
-  $("source").innerHTML = opts; $("wlSource").innerHTML = opts;
+  $("source").innerHTML = opts; $("wlSource").innerHTML = opts; $("swSource").innerHTML = opts;
   $("source").value = config.sources.includes("demo") ? "demo" : config.sources[0];
+  $("swSource").value = $("source").value;
   $("minMargin").value = config.thresholds.minMarginPct;
   $("minProfit").value = config.thresholds.minAbsoluteProfit;
   $("minConf").value = config.thresholds.minMatchConfidence;
@@ -488,6 +519,48 @@ async function renderSettings() {
 $("testAlert").addEventListener("click", async () => {
   const r = await (await fetch("/api/notify/test", { method: "POST" })).json();
   toast(r.sent ? `Test alert sent to ${r.sent} channel(s)` : "No alert channels configured");
+});
+
+// --- discover (sweeps) ---
+let starterKeywords = [];
+async function loadSweeps() {
+  const data = await (await fetch("/api/sweeps")).json();
+  starterKeywords = data.starterKeywords || [];
+  $("sweepCount").textContent = data.sweeps.length;
+  const rows = data.sweeps.map((s) => {
+    const pos = s.keywords.length ? `${(s.cursor % s.keywords.length)}/${s.keywords.length}` : "0/0";
+    return `<tr>
+      <td><b>${esc(s.label)}</b><div class="sub">${esc(s.source)} · ${s.keywords.length} keywords${s.maxPrice ? " · ≤$" + s.maxPrice : ""}</div></td>
+      <td class="num">${s.intervalMin}m ×${s.perTick}</td>
+      <td class="num">${pos}</td>
+      <td><div class="sub">${esc(s.lastKeyword || "—")}</div><div class="num">${s.totalFound ?? 0} found</div></td>
+      <td><span class="toggle ${s.enabled ? "on" : ""}" data-id="${s.id}" data-en="${s.enabled}">${s.enabled ? "● live" : "○ paused"}</span></td>
+      <td class="actions"><button class="ghost" data-run="${s.id}">Run next</button><button class="ghost danger" data-del="${s.id}">✕</button></td>
+    </tr>`;
+  }).join("");
+  $("swList").innerHTML = data.sweeps.length
+    ? `<div class="panel"><table class="wl"><thead><tr><th>Sweep</th><th>Cadence</th><th>Cursor</th><th>Last / found</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : `<div class="state">No discovery sweeps yet. Add one above (or load the starter pack) to constantly hunt new categories.</div>`;
+  $("swList").querySelectorAll("[data-run]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true; b.textContent = "…";
+    const r = await (await fetch(`/api/sweeps/${b.dataset.run}/run`, { method: "POST" })).json();
+    toast(r.error ? r.error : `swept ${(r.ran||[]).join(", ")} · ${r.newlySaved} new`); loadSweeps(); loadSaved();
+  }));
+  $("swList").querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => { await fetch(`/api/sweeps/${b.dataset.del}`, { method: "DELETE" }); toast("Removed"); loadSweeps(); }));
+  $("swList").querySelectorAll(".toggle").forEach((t) => t.addEventListener("click", async () => {
+    await fetch(`/api/sweeps/${t.dataset.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: t.dataset.en !== "true" }) }); loadSweeps();
+  }));
+}
+$("swStarter").addEventListener("click", () => { $("swKeywords").value = starterKeywords.join("\n"); toast(`Loaded ${starterKeywords.length} starter keywords`); });
+$("swForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const keywords = $("swKeywords").value.split(/[\n,]/).map((k) => k.trim()).filter(Boolean);
+  if (!keywords.length) return toast("Add at least one keyword (or load the starter pack)");
+  const r = await fetch("/api/sweeps", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label: $("swLabel").value || "Discovery", keywords, source: $("swSource").value,
+      maxPrice: $("swCap").value || undefined, intervalMin: +$("swInterval").value, perTick: +$("swPerTick").value, thresholds: thresholdsFromSliders() }) });
+  const data = await r.json(); if (!r.ok) return toast(data.error || "failed");
+  toast(`Sweep "${data.sweep.label}" created (${data.sweep.keywords.length} keywords)`); loadSweeps();
 });
 
 $("form").addEventListener("submit", run);
