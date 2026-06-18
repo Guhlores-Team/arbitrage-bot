@@ -256,6 +256,16 @@ Config (env): `FACEBOOK_USER_DATA_DIR` (default `.fb-session`, gitignored),
 no login (public search). Best-effort selectors; same ToS caveat and safeguards.
 Set `OFFERUP_HEADFUL=true` to watch it run.
 
+**Apify-backed sources (no DIY scraping):** add buy sources by config — Apify's
+maintained actors handle the proxies/anti-bot. Set `APIFY_TOKEN` and define
+sources in `APIFY_SOURCES`:
+```bash
+APIFY_TOKEN=apify_api_xxx
+APIFY_SOURCES=[{"name":"fb","actor":"apify/facebook-marketplace-scraper","queryField":"keyword","input":{"maxItems":25},"map":{"price":"price","url":"listingUrl","image":"image"}}]
+```
+Each becomes a selectable source (and joins `all` sweeps). `map` overrides the
+actor's output field names; `queryField` is the actor input that takes the term.
+
 **Craigslist photos** — RSS omits images. Set `CRAIGSLIST_ENRICH=true` to fetch
 each listing page (throttled, capped) and fill real image URLs + missing prices,
 so the vision-identify step has photos to work with.

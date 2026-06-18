@@ -5,32 +5,37 @@ import { MercariConnector } from "./connectors/mercari.js";
 import { ShopGoodwillConnector } from "./connectors/shopgoodwill.js";
 import { MockSourceConnector } from "./connectors/mock.js";
 import { MultiSourceConnector } from "./connectors/multi.js";
+import { ApifyConnector, parseApifySources } from "./connectors/apify.js";
 import type { SourceConnector } from "./connectors/connector.js";
 
-/** Source connectors the CLI and dashboard can select by name. */
-export const SOURCES = ["demo", "craigslist", "facebook", "offerup", "mercari", "shopgoodwill"] as const;
-export type SourceName = (typeof SOURCES)[number];
+/**
+ * Source registry: built-in connectors plus any Apify-backed sources defined in
+ * APIFY_SOURCES. Each entry is a factory so connectors are created per-use.
+ */
+const registry: Record<string, () => SourceConnector> = {
+  demo: () => new MockSourceConnector(),
+  craigslist: () => new CraigslistConnector(),
+  facebook: () => new FacebookConnector(),
+  offerup: () => new OfferUpConnector(),
+  mercari: () => new MercariConnector(),
+  shopgoodwill: () => new ShopGoodwillConnector(),
+};
 
-/** Real (non-demo) local marketplaces — what "all" sweeps across. */
+// Register Apify-backed sources from env (config-driven; no code per source).
+for (const cfg of parseApifySources()) {
+  if (!registry[cfg.name]) registry[cfg.name] = () => new ApifyConnector(cfg);
+}
+
+/** Source names the CLI and dashboard can select. */
+export const SOURCES: readonly string[] = Object.keys(registry);
+
+/** Real (non-demo) marketplaces — what "all" sweeps across. */
 export const LIVE_SOURCES = SOURCES.filter((s) => s !== "demo");
 
 export function pickSource(name: string): SourceConnector {
-  switch (name) {
-    case "facebook":
-      return new FacebookConnector();
-    case "offerup":
-      return new OfferUpConnector();
-    case "mercari":
-      return new MercariConnector();
-    case "shopgoodwill":
-      return new ShopGoodwillConnector();
-    case "craigslist":
-      return new CraigslistConnector();
-    case "demo":
-      return new MockSourceConnector();
-    default:
-      throw new Error(`unknown source "${name}" (expected ${SOURCES.join("|")})`);
-  }
+  const make = registry[name];
+  if (!make) throw new Error(`unknown source "${name}" (expected ${SOURCES.join("|")})`);
+  return make();
 }
 
 /** Expand a source spec into the list of source names it targets. */
@@ -44,7 +49,7 @@ export function expandSourceSpec(spec: string): string[] {
 
 export function isValidSourceSpec(spec: string): boolean {
   const names = expandSourceSpec(spec);
-  return names.length > 0 && names.every((n) => (SOURCES as readonly string[]).includes(n));
+  return names.length > 0 && names.every((n) => SOURCES.includes(n));
 }
 
 /**
