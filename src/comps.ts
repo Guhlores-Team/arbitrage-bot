@@ -3,18 +3,23 @@ import { PriceChartingConnector } from "./connectors/pricecharting.js";
 import { KeepaConnector } from "./connectors/keepa.js";
 import { StockXConnector } from "./connectors/stockx.js";
 import { SerpApiShoppingConnector } from "./connectors/serpapi.js";
+import { ApifyCompConnector } from "./connectors/apify-comp.js";
 import { MultiCompConnector } from "./connectors/multicomp.js";
 import { RoutingCompConnector } from "./connectors/routing.js";
 import { effectiveCompSources } from "./settings.js";
 import type { CompConnector } from "./connectors/connector.js";
 
 /** Comp markets the engine can value against. */
-export const COMP_MARKETS = ["ebay", "pricecharting", "keepa", "stockx", "google"] as const;
+export const COMP_MARKETS = ["ebay", "ebay-sold", "pricecharting", "keepa", "stockx", "google"] as const;
 
 function makeComp(name: string): CompConnector | null {
   switch (name) {
     case "ebay":
       return new EbayCompConnector();
+    case "ebay-sold":
+    case "apify":
+      // Real eBay SOLD prices from your own Apify actor (/actors/ebay-sold).
+      return new ApifyCompConnector();
     case "pricecharting":
       return new PriceChartingConnector();
     case "keepa":

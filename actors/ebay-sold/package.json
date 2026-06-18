@@ -1,0 +1,14 @@
+{
+  "name": "ebay-sold-listings-scraper",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Scrape eBay SOLD / completed listings — real realized sale prices, condition and sold date — for resale comps and pricing research.",
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "apify": "^3.2.6",
+    "crawlee": "^3.11.5"
+  },
+  "scripts": {
+    "start": "node src/main.js"
+  }
+}

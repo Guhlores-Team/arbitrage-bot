@@ -1,0 +1,46 @@
+{
+  "title": "eBay Sold Listings Scraper",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "query": {
+      "title": "Search query",
+      "type": "string",
+      "description": "What to search eBay sold/completed listings for.",
+      "editor": "textfield",
+      "prefill": "nintendo switch oled"
+    },
+    "maxItems": {
+      "title": "Max sold listings",
+      "type": "integer",
+      "description": "Stop after this many sold comps.",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 200
+    },
+    "condition": {
+      "title": "Condition filter",
+      "type": "string",
+      "description": "Restrict to a condition.",
+      "editor": "select",
+      "default": "any",
+      "enum": ["any", "new", "used"],
+      "enumTitles": ["Any", "New", "Used"]
+    },
+    "maxPrice": {
+      "title": "Max price",
+      "type": "integer",
+      "description": "Drop comps above this price (optional).",
+      "nullable": true,
+      "minimum": 0
+    },
+    "proxyConfiguration": {
+      "title": "Proxy",
+      "type": "object",
+      "description": "Residential proxy is recommended so eBay doesn't throttle/block the run.",
+      "editor": "proxy",
+      "default": { "useApifyProxy": true, "apifyProxyGroups": ["RESIDENTIAL"] }
+    }
+  },
+  "required": ["query"]
+}

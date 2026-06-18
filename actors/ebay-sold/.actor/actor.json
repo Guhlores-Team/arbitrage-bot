@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "ebay-sold-listings-scraper",
+  "title": "eBay Sold Listings Scraper",
+  "description": "Scrape eBay SOLD / completed listings — title, realized sale price, condition, sold date, image and URL. Real comps for resale pricing, no eBay API approval needed.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}
