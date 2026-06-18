@@ -13,6 +13,7 @@ import { llmInfo } from "./llm.js";
 import { compInfo } from "./comps.js";
 import { startWatch } from "./watch.js";
 import { STARTER_KEYWORDS } from "./sweep.js";
+import { generateListing } from "./listing.js";
 
 /**
  * Dashboard server. Zero external deps — Node's http only — so it starts with
@@ -102,6 +103,13 @@ const server = createServer(async (req, res) => {
     if (oppMatch && method === "PATCH") {
       const o = await store.setOpportunityOutcome(oppMatch[1], await readBody(req));
       return o ? json(res, 200, { opportunity: o }) : json(res, 404, { error: "not found" });
+    }
+
+    const draftMatch = path.match(/^\/api\/opportunities\/([\w-]+)\/draft$/);
+    if (draftMatch && method === "POST") {
+      const o = (await store.listOpportunities()).find((x) => x.id === draftMatch[1]);
+      if (!o) return json(res, 404, { error: "not found" });
+      return json(res, 200, { draft: await serialize(() => generateListing(o)) });
     }
 
     if (path === "/api/watchlists") {

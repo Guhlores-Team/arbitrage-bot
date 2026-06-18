@@ -401,6 +401,7 @@ function card(o) {
         <button class="ghost" data-act="bought" data-id="${esc(o.id)}">Bought</button>
         <button class="ghost" data-act="sold" data-id="${esc(o.id)}">Sold</button>
         <button class="ghost" data-act="skipped" data-id="${esc(o.id)}">Skip</button>
+        <button class="ghost" data-draft="${esc(o.id)}">Draft</button>
       </div>` : ""}
       <div class="foot"><span class="muted">${esc(o.condition)}</span><a class="view-link" href="${esc(o.url)}" target="_blank" rel="noopener">View ↗</a></div>
     </div>
@@ -469,6 +470,7 @@ function renderSaved() {
   $("refreshSaved").addEventListener("click", loadSaved);
   $("clearSaved").addEventListener("click", async () => { if (!confirm("Clear all saved opportunities?")) return; await fetch("/api/opportunities", { method: "DELETE" }); toast("Cleared"); loadSaved(); });
   $("savedResults").querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => oppAction(b.dataset.id, b.dataset.act)));
+  $("savedResults").querySelectorAll("[data-draft]").forEach((b) => b.addEventListener("click", () => draftListing(b.dataset.draft, b)));
   if (savedList.length) { wireToolbar("saved", savedState, renderSaved); $("savedCount").textContent = savedList.length; }
 }
 
@@ -483,6 +485,19 @@ function ledgerBar(list) {
     <div class="stat"><div class="k">Sold</div><div class="v">${sold.length}</div></div>
     <div class="stat"><div class="k">Holding (bought)</div><div class="v">${holding}</div></div>
   </div>`;
+}
+
+async function draftListing(id, btn) {
+  btn.disabled = true; const old = btn.textContent; btn.textContent = "…";
+  try {
+    const r = await fetch(`/api/opportunities/${id}/draft`, { method: "POST" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "failed");
+    const t = `TITLE: ${d.draft.title}\nPRICE: $${d.draft.price}\n\n${d.draft.description}`;
+    try { await navigator.clipboard.writeText(t); toast("Listing draft copied to clipboard"); }
+    catch { window.prompt("Listing draft (copy):", t); }
+  } catch (e) { toast(e.message); }
+  finally { btn.disabled = false; btn.textContent = old; }
 }
 
 async function oppAction(id, act) {
