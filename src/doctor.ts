@@ -58,7 +58,7 @@ async function main() {
   // Live source probes. Demo is always fine; the browser sources need network +
   // (for Facebook) a logged-in session, so we surface the real failure reason.
   const args = process.argv.slice(2);
-  const toProbe = args.length ? args : ["demo", "craigslist", "offerup", "facebook"];
+  const toProbe = args.length ? args : ["demo", "craigslist", "offerup", "mercari", "facebook"];
   console.log("\n  Live source probes (pass source names as args to narrow):");
   for (const name of toProbe) {
     try {
