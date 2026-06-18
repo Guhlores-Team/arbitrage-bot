@@ -7,6 +7,8 @@ import { SOURCES } from "./sources.js";
 import { THRESHOLDS } from "./scoring/score.js";
 import { parseScanParams, runScan } from "./scan.js";
 import { store } from "./store.js";
+import { notify, notifierStatus, notifyOpportunities } from "./notify.js";
+import { EbayCompConnector } from "./connectors/ebay.js";
 
 /**
  * Dashboard server. Zero external deps — Node's http only — so it starts with
@@ -52,7 +54,16 @@ const server = createServer(async (req, res) => {
         thresholds: THRESHOLDS,
         hasAnthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
         ebayMockComps: (process.env.EBAY_USE_MOCK_COMPS ?? "true") === "true",
+        compSource: new EbayCompConnector().effectiveSource,
+        notifiers: notifierStatus(),
       });
+    }
+
+    if (method === "POST" && path === "/api/notify/test") {
+      const status = notifierStatus();
+      if (!status.any) return json(res, 200, { sent: 0, status });
+      const sent = await notify("✅ Arbitrage Engine test alert — notifications are wired up.");
+      return json(res, 200, { sent, status });
     }
 
     if (method === "POST" && path === "/api/search") {
@@ -103,8 +114,10 @@ async function handleSearch(res: any, body: any) {
   const result = await serialize(() => runScan(params));
   // Persist the passing opportunities so they show up in the saved feed.
   const passing = result.opportunities.filter((o) => o.passes);
-  if (passing.length) await store.saveOpportunities(passing, { source: params.source, query: params.query });
-  return json(res, 200, result);
+  const added = passing.length
+    ? await store.saveOpportunities(passing, { source: params.source, query: params.query })
+    : [];
+  return json(res, 200, { ...result, meta: { ...result.meta, newlySaved: added.length } });
 }
 
 async function handleCreateWatchlist(res: any, body: any) {
@@ -130,9 +143,10 @@ async function handleRunWatchlist(res: any, id: string) {
   const passing = result.opportunities.filter((o) => o.passes);
   const added = passing.length
     ? await store.saveOpportunities(passing, { source: wl.source, query: wl.query })
-    : 0;
+    : [];
   await store.updateWatchlist(id, { lastRunAt: new Date().toISOString(), lastFoundCount: passing.length });
-  return json(res, 200, { meta: result.meta, newlySaved: added });
+  if (added.length) await notifyOpportunities({ source: wl.source, query: wl.query }, added);
+  return json(res, 200, { meta: result.meta, newlySaved: added.length });
 }
 
 async function serveStatic(res: any, pathname: string) {

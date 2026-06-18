@@ -2,16 +2,21 @@ import type { SoldComp, Condition } from "../types.js";
 import type { CompConnector } from "./connector.js";
 
 /**
- * eBay sell-market connector — provides SOLD comparables to value an item.
+ * eBay sell-market connector — provides comparables to value an item against.
  *
- * Real sold data comes from the Marketplace Insights API, which is GATED:
- * you apply to eBay for access. Until you're approved (EBAY_USE_MOCK_COMPS=true),
- * this returns deterministic mock comps so the whole pipeline runs end to end.
+ * Three comp sources, picked by EBAY_COMP_SOURCE (default "auto"):
+ *   - "insights": Marketplace Insights API → real SOLD prices. GATED: you must
+ *     apply to eBay for access. The truest comp.
+ *   - "browse":   Browse API → ACTIVE asking prices. Works with just app
+ *     credentials (no gated access). A rougher comp (asks, not solds) but free
+ *     and ungated, so it's the practical default once you have keys.
+ *   - "mock":     deterministic offline comps so the pipeline runs with no keys.
+ *   - "auto":     try insights, fall back to browse, fall back to mock.
  *
- * The OAuth + request shape below is the real client-credentials flow, so once
- * you have keys + access you flip EBAY_USE_MOCK_COMPS=false and wire the real
- * endpoint in fetchRealComps().
+ * EBAY_USE_MOCK_COMPS=true (or missing client id) forces mock regardless.
  */
+export type CompSource = "auto" | "insights" | "browse" | "mock";
+
 export class EbayCompConnector implements CompConnector {
   readonly market = "ebay";
   private token?: { value: string; expiresAt: number };
@@ -20,11 +25,37 @@ export class EbayCompConnector implements CompConnector {
     private clientId = process.env.EBAY_CLIENT_ID ?? "",
     private clientSecret = process.env.EBAY_CLIENT_SECRET ?? "",
     private useMock = (process.env.EBAY_USE_MOCK_COMPS ?? "true") === "true",
+    private compSource: CompSource = (process.env.EBAY_COMP_SOURCE as CompSource) ?? "auto",
   ) {}
+
+  /** Which comp source this instance will actually use, for display/debugging. */
+  get effectiveSource(): CompSource {
+    if (this.useMock || !this.clientId) return "mock";
+    return this.compSource;
+  }
 
   async getSoldComps(searchString: string, limit = 20): Promise<SoldComp[]> {
     if (this.useMock || !this.clientId) return this.mockComps(searchString, limit);
-    return this.fetchRealComps(searchString, limit);
+
+    switch (this.compSource) {
+      case "mock":
+        return this.mockComps(searchString, limit);
+      case "insights":
+        return this.fetchInsights(searchString, limit);
+      case "browse":
+        return this.fetchBrowse(searchString, limit);
+      case "auto":
+      default:
+        try {
+          return await this.fetchInsights(searchString, limit);
+        } catch {
+          try {
+            return await this.fetchBrowse(searchString, limit);
+          } catch {
+            return this.mockComps(searchString, limit);
+          }
+        }
+    }
   }
 
   // --- real OAuth client-credentials token ---
@@ -48,8 +79,8 @@ export class EbayCompConnector implements CompConnector {
     return this.token.value;
   }
 
-  // --- real sold-comps call (Marketplace Insights; requires granted access) ---
-  private async fetchRealComps(searchString: string, limit: number): Promise<SoldComp[]> {
+  // --- SOLD comps (Marketplace Insights; requires granted access) ---
+  private async fetchInsights(searchString: string, limit: number): Promise<SoldComp[]> {
     const token = await this.getToken();
     const url =
       "https://api.ebay.com/buy/marketplace_insights/v1_beta/item_sales/search?" +
@@ -71,6 +102,33 @@ export class EbayCompConnector implements CompConnector {
       soldAt: s.lastSoldDate,
       url: s.itemWebUrl,
     }));
+  }
+
+  // --- ACTIVE asks (Browse API; ungated, just needs app credentials) ---
+  private async fetchBrowse(searchString: string, limit: number): Promise<SoldComp[]> {
+    const token = await this.getToken();
+    const url =
+      "https://api.ebay.com/buy/browse/v1/item_summary/search?" +
+      new URLSearchParams({ q: searchString, limit: String(Math.min(limit, 200)) }).toString();
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "X-EBAY-C-MARKETPLACE-ID": process.env.EBAY_MARKETPLACE_ID ?? "EBAY_US",
+      },
+    });
+    if (!res.ok) throw new Error(`ebay browse ${res.status}: ${await res.text()}`);
+    const json: any = await res.json();
+    return (json.itemSummaries ?? [])
+      .map((s: any): SoldComp => ({
+        id: s.itemId,
+        title: s.title,
+        // Browse returns ASKING prices, not solds — a rougher comp by nature.
+        soldPrice: Number(s.price?.value ?? 0),
+        currency: s.price?.currency ?? "USD",
+        condition: mapEbayCondition(s.condition),
+        url: s.itemWebUrl,
+      }))
+      .filter((c: SoldComp) => c.soldPrice > 0);
   }
 
   // --- deterministic mock so the pipeline runs before you have access ---

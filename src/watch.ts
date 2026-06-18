@@ -1,6 +1,7 @@
 import "./env.js";
 import { store, type Watchlist } from "./store.js";
 import { runScan } from "./scan.js";
+import { notifyOpportunities, notifierStatus } from "./notify.js";
 
 /**
  * Watch runner: periodically runs each enabled watchlist, saves passing
@@ -44,14 +45,15 @@ async function runOne(wl: Watchlist): Promise<void> {
       thresholds: wl.thresholds,
     });
     const passing = res.opportunities.filter((o) => o.passes);
-    const added = passing.length ? await store.saveOpportunities(passing, { source: wl.source, query: wl.query }) : 0;
+    const added = passing.length ? await store.saveOpportunities(passing, { source: wl.source, query: wl.query }) : [];
     await store.updateWatchlist(wl.id, { lastRunAt: new Date().toISOString(), lastFoundCount: passing.length });
 
     const stamp = new Date().toLocaleTimeString();
-    console.log(`${stamp}  ${tag}: ${res.meta.count} scanned, ${passing.length} pass, ${added} new`);
-    for (const o of passing.slice(0, added).sort((a, b) => b.score - a.score)) {
+    console.log(`${stamp}  ${tag}: ${res.meta.count} scanned, ${passing.length} pass, ${added.length} new`);
+    for (const o of [...added].sort((a, b) => b.score - a.score)) {
       console.log(`   🔔 ${o.title} — buy $${o.buy} → net $${o.net} (${Math.round(o.marginPct * 100)}%)  ${o.url}`);
     }
+    if (added.length) await notifyOpportunities({ source: wl.source, query: wl.query }, added);
   } catch (err: any) {
     console.error(`${new Date().toLocaleTimeString()}  ${tag}: ERROR ${err?.message ?? err}`);
   }
@@ -59,7 +61,9 @@ async function runOne(wl: Watchlist): Promise<void> {
 
 async function main() {
   const wls = await store.listWatchlists();
-  console.log(`\n  Watch runner started — ${wls.filter((w) => w.enabled).length} active watchlist(s).`);
+  const n = notifierStatus();
+  const channels = [n.telegram && "Telegram", n.webhook && "webhook"].filter(Boolean).join(" + ") || "console only";
+  console.log(`\n  Watch runner started — ${wls.filter((w) => w.enabled).length} active watchlist(s). Alerts: ${channels}.`);
   console.log("  Add watchlists from the dashboard (Watch tab). Ctrl+C to stop.\n");
   await tick();
   setInterval(tick, TICK_MS);

@@ -43,3 +43,23 @@ test("throws a useful error on non-ok responses", async () => {
   globalThis.fetch = (async () => ({ ok: false, status: 503, text: async () => "" }) as any) as typeof fetch;
   await assert.rejects(() => new CraigslistConnector("sfbay").search({ query: "switch" }), /503/);
 });
+
+test("enrichment pulls images (and missing prices) from the listing page", async () => {
+  const PAGE = `<html><meta property="og:image" content="x">
+    <img src="https://images.craigslist.org/abc123_def456_300x300.jpg">
+    <img src="https://images.craigslist.org/zzz999_yyy888_600x450.jpg">
+    <span class="price">$150</span></html>`;
+  globalThis.fetch = (async (input: any) => {
+    const url = String(input);
+    const body = url.includes("format=rss") ? SAMPLE_RSS : PAGE;
+    return { ok: true, status: 200, text: async () => body } as any;
+  }) as typeof fetch;
+
+  const out = await new CraigslistConnector("sfbay", true).search({ query: "switch" });
+  const couch = out.find((l) => l.id === "cl_7712999999")!;
+  assert.ok(couch.imageUrls.length >= 1);
+  assert.ok(couch.imageUrls.every((u) => u.startsWith("https://images.craigslist.org/")));
+  // thumbnail size is normalized up
+  assert.ok(couch.imageUrls.some((u) => u.endsWith("_600x450.jpg")));
+  assert.equal(couch.price, 150); // was 0 from RSS, filled from page
+});

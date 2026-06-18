@@ -18,7 +18,10 @@ export class CraigslistConnector implements SourceConnector {
   readonly source = "craigslist";
   private parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
 
-  constructor(private region = process.env.CRAIGSLIST_REGION ?? "sfbay") {}
+  constructor(
+    private region = process.env.CRAIGSLIST_REGION ?? "sfbay",
+    private enrich = (process.env.CRAIGSLIST_ENRICH ?? "false") === "true",
+  ) {}
 
   async search(q: SearchQuery): Promise<SourceListing[]> {
     const params = new URLSearchParams({ query: q.query, format: "rss" });
@@ -54,7 +57,43 @@ export class CraigslistConnector implements SourceConnector {
         fetchedAt: now,
       });
     }
+
+    // RSS gives no images and unreliable prices. When enrichment is on, fetch
+    // each listing page (throttled, capped) to fill imageUrls + missing prices
+    // so the vision identify step actually has photos to work with.
+    if (this.enrich) await this.enrichAll(out);
+
     return out;
+  }
+
+  /** Sequentially enrich listings from their detail pages (polite, bounded). */
+  private async enrichAll(listings: SourceListing[], cap = 20): Promise<void> {
+    for (const l of listings.slice(0, cap)) {
+      try {
+        const res = await fetch(l.url, {
+          headers: { "User-Agent": "arbitrage-engine/0.1 (personal research)" },
+        });
+        if (!res.ok) continue;
+        const html = await res.text();
+        l.imageUrls = this.imagesFrom(html);
+        if (l.price === 0) l.price = this.priceFrom(html);
+      } catch {
+        // skip unreachable / changed pages
+      }
+      await sleep(400 + Math.random() * 400); // be gentle on the source
+    }
+  }
+
+  /** Pull craigslist-hosted image URLs from a listing page (deduped, capped). */
+  private imagesFrom(html: string, max = 4): string[] {
+    const re = /https:\/\/images\.craigslist\.org\/[\w]+_[\w]+(?:_[0-9x]+)?\.jpg/g;
+    const seen = new Set<string>();
+    for (const m of html.matchAll(re)) {
+      // normalize to a larger variant when craigslist gives a thumbnail size
+      seen.add(m[0].replace(/_[0-9]+x[0-9]+\.jpg$/, "_600x450.jpg"));
+      if (seen.size >= max) break;
+    }
+    return [...seen];
   }
 
   private idFromLink(link: string): string {
@@ -74,3 +113,5 @@ export class CraigslistConnector implements SourceConnector {
     return s.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   }
 }
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

@@ -64,19 +64,21 @@ export class JsonStore {
 
   /**
    * Upsert opportunities by listing id, keeping the most recent scan's figures.
-   * Tags each with the source/query/time it was found. Returns how many were new.
+   * Tags each with the source/query/time it was found. Returns the ones that
+   * were newly added (not previously in the store) so callers can alert on them.
    */
   async saveOpportunities(
     opps: OpportunityView[],
     meta: { source: string; query: string },
-  ): Promise<number> {
+  ): Promise<OpportunityView[]> {
     await this.load();
     const now = new Date().toISOString();
     const byId = new Map(this.data.opportunities.map((o) => [o.id, o]));
-    let added = 0;
+    const added: OpportunityView[] = [];
     for (const o of opps) {
-      if (!byId.has(o.id)) added++;
-      byId.set(o.id, { ...o, source: meta.source, query: meta.query, savedAt: now });
+      const tagged = { ...o, source: meta.source, query: meta.query, savedAt: now };
+      if (!byId.has(o.id)) added.push(tagged);
+      byId.set(o.id, tagged);
     }
     this.data.opportunities = [...byId.values()]
       .sort((a, b) => (b.savedAt ?? "").localeCompare(a.savedAt ?? ""))
