@@ -19,6 +19,7 @@ import { notifyOpportunities, notifierStatus } from "./notify.js";
 
 const TICK_MS = 60_000;
 let ticking = false;
+let started = false;
 
 async function tick(): Promise<void> {
   if (ticking) return; // a long scan can outlast the interval; skip overlapping ticks
@@ -33,6 +34,22 @@ async function tick(): Promise<void> {
   } finally {
     ticking = false;
   }
+}
+
+/**
+ * Start the watch loop. Safe to call from the dashboard server (so a single
+ * process serves the UI and runs scheduled scans) or from the standalone
+ * `npm run watch` entrypoint. Idempotent.
+ */
+export async function startWatch(): Promise<void> {
+  if (started) return;
+  started = true;
+  const wls = await store.listWatchlists();
+  const n = notifierStatus();
+  const channels = [n.telegram && "Telegram", n.webhook && "webhook"].filter(Boolean).join(" + ") || "console only";
+  console.log(`  Watch runner active — ${wls.filter((w) => w.enabled).length} enabled watchlist(s). Alerts: ${channels}.`);
+  await tick();
+  setInterval(tick, TICK_MS);
 }
 
 async function runOne(wl: Watchlist): Promise<void> {
@@ -59,17 +76,12 @@ async function runOne(wl: Watchlist): Promise<void> {
   }
 }
 
-async function main() {
-  const wls = await store.listWatchlists();
-  const n = notifierStatus();
-  const channels = [n.telegram && "Telegram", n.webhook && "webhook"].filter(Boolean).join(" + ") || "console only";
-  console.log(`\n  Watch runner started — ${wls.filter((w) => w.enabled).length} active watchlist(s). Alerts: ${channels}.`);
-  console.log("  Add watchlists from the dashboard (Watch tab). Ctrl+C to stop.\n");
-  await tick();
-  setInterval(tick, TICK_MS);
+// Standalone entrypoint: run only when invoked directly (npm run watch), not
+// when imported by the server.
+if (process.argv[1] && /watch\.(ts|js)$/.test(process.argv[1])) {
+  console.log("\n  Watch runner — add watchlists from the dashboard (Watch tab). Ctrl+C to stop.\n");
+  startWatch().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
 }
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});

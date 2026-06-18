@@ -62,6 +62,42 @@ npm run doctor                                        # live self-test of every 
 npm test                                              # node:test suite
 ```
 
+## Deploy on a VM (always-on, one process)
+
+For a small VM (≈2 vCPU / 4 GB, e.g. an `e2-medium`) running alongside other
+workloads:
+
+```bash
+# lean install — skips Playwright + Prisma (~150 MB, eBay + Craigslist only)
+npm ci --omit=optional
+
+# full install — adds browser sources (~480 MB on disk)
+npm ci && npx playwright install chromium
+```
+
+Run the dashboard **and** the scheduler in a single process:
+
+```bash
+npm run serve     # = WATCH_IN_SERVER=true: UI on :3000 + scheduled watchlists
+```
+
+Keep it up across reboots with the included **systemd unit**
+(`deploy/arbitrage-engine.service`) — it sets a `MemoryMax` cap so a browser
+scrape can never starve a co-located trading stack:
+
+```bash
+sudo cp deploy/arbitrage-engine.service /etc/systemd/system/
+sudo systemctl enable --now arbitrage-engine
+journalctl -u arbitrage-engine -f      # live logs + alerts
+```
+
+The dashboard binds to `127.0.0.1`; reach it from your laptop over an SSH
+tunnel: `gcloud compute ssh VM -- -L 3000:localhost:3000`.
+
+**Footprint:** ~150 MB lean / ~480 MB full on disk; ~90 MB RAM idle, +~0.3–0.6 GB
+transient during a single (serialized) browser scrape. Playwright upgrades can
+leave stale Chromium builds — prune with `npm run clean:browsers`.
+
 ## Will scraping work here? Run the doctor
 
 ```bash

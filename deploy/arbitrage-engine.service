@@ -1,0 +1,39 @@
+# systemd unit — runs the dashboard + scheduled watchlists as one always-on
+# process, with a hard memory cap so a browser scrape can never starve a
+# co-located trading stack.
+#
+# Install (edit the paths/user first):
+#   sudo cp deploy/arbitrage-engine.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now arbitrage-engine
+#   systemctl status arbitrage-engine
+#   journalctl -u arbitrage-engine -f          # live logs / alerts
+#
+# `npm` path: run `which npm` and put the result in ExecStart. If you use nvm,
+# it's usually ~/.nvm/versions/node/<ver>/bin/npm (not /usr/bin/npm).
+
+[Unit]
+Description=Arbitrage Engine (dashboard + watch)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alynx066
+WorkingDirectory=/home/alynx066/arbitrage-bot
+EnvironmentFile=/home/alynx066/arbitrage-bot/.env
+Environment=WATCH_IN_SERVER=true
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+ExecStart=/usr/bin/env npm run serve
+Restart=on-failure
+RestartSec=5
+
+# Safety belt on a shared VM: cap total memory (one headless Chromium + node
+# stays well under this). The service is throttled/killed before it can pressure
+# your trading processes; systemd restarts it.
+MemoryMax=1200M
+MemoryHigh=1000M
+
+[Install]
+WantedBy=multi-user.target

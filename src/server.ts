@@ -11,6 +11,7 @@ import { notify, notifierStatus, notifyOpportunities } from "./notify.js";
 import { EbayCompConnector } from "./connectors/ebay.js";
 import { health } from "./health.js";
 import { llmInfo } from "./llm.js";
+import { startWatch } from "./watch.js";
 
 /**
  * Dashboard server. Zero external deps — Node's http only — so it starts with
@@ -207,9 +208,16 @@ function json(res: any, status: number, payload: unknown) {
 }
 
 server.listen(PORT, HOST, () => {
-  console.log(`\n  Arbitrage dashboard → http://${HOST}:${PORT}\n`);
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.log("  (no ANTHROPIC_API_KEY: identify/match run in offline heuristic mode)");
+  console.log(`\n  Arbitrage dashboard → http://${HOST}:${PORT}`);
+  if (!llmInfo().configured) {
+    console.log("  (no LLM key: identify/match run in offline heuristic mode)");
   }
-  console.log("  Try the 'demo' source for instant results with no setup.\n");
+  // One-process deploy: also run scheduled watchlists here when asked, so a
+  // single `npm run dashboard` covers the UI + the scheduler on one VM.
+  if ((process.env.WATCH_IN_SERVER ?? "false") === "true") {
+    startWatch().catch((e) => console.error("watch loop failed to start:", e));
+  } else {
+    console.log("  (set WATCH_IN_SERVER=true to run scheduled watchlists in this process)");
+  }
+  console.log("");
 });
