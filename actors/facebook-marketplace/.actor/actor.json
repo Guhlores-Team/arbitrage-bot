@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "facebook-marketplace-scraper",
+  "title": "Facebook Marketplace Scraper",
+  "description": "Scrape Facebook Marketplace search results — title, price, location, image and listing URL — with your login cookies and residential proxy.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

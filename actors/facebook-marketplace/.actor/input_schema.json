@@ -1,0 +1,59 @@
+{
+  "title": "Facebook Marketplace Scraper",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "query": {
+      "title": "Search query",
+      "type": "string",
+      "description": "What to search Facebook Marketplace for.",
+      "editor": "textfield",
+      "prefill": "nintendo switch"
+    },
+    "location": {
+      "title": "Marketplace location",
+      "type": "string",
+      "description": "Facebook Marketplace location slug or city id (e.g. nyc, la, sfbay).",
+      "editor": "textfield",
+      "default": "nyc"
+    },
+    "maxItems": {
+      "title": "Max listings",
+      "type": "integer",
+      "description": "Stop after this many listings.",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 300
+    },
+    "maxScrolls": {
+      "title": "Max scrolls",
+      "type": "integer",
+      "description": "Hard cap on scroll cycles (controls cost vs. depth).",
+      "default": 12,
+      "minimum": 1,
+      "maximum": 60
+    },
+    "maxPrice": {
+      "title": "Max price",
+      "type": "integer",
+      "description": "Drop listings above this price (optional).",
+      "nullable": true,
+      "minimum": 0
+    },
+    "cookies": {
+      "title": "Facebook cookies",
+      "type": "array",
+      "description": "Your logged-in Facebook cookies as a JSON array (export with the Cookie-Editor browser extension). Required — Marketplace needs an authenticated session.",
+      "editor": "json",
+      "nullable": true
+    },
+    "proxyConfiguration": {
+      "title": "Proxy",
+      "type": "object",
+      "description": "Use Apify residential proxies (recommended) or your own.",
+      "editor": "proxy",
+      "default": { "useApifyProxy": true, "apifyProxyGroups": ["RESIDENTIAL"] }
+    }
+  },
+  "required": ["query"]
+}
