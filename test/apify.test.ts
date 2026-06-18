@@ -68,3 +68,21 @@ test("ApifyConnector throws a clear error without a token", async () => {
   const c = new ApifyConnector({ name: "fb", actor: "x/y" });
   await assert.rejects(() => c.search({ query: "z" }), /APIFY_TOKEN/);
 });
+
+test("ApifyConnector hits the actor-tasks endpoint when taskId is set", async () => {
+  process.env.APIFY_TOKEN = "apify_xxx";
+  let calledUrl = "";
+  globalThis.fetch = (async (u: any) => {
+    calledUrl = String(u);
+    return { ok: true, json: async () => [] } as any;
+  }) as typeof fetch;
+  await new ApifyConnector({ name: "fb", taskId: "me~fb-task", queryField: "keyword" }).search({ query: "x" });
+  assert.match(calledUrl, /actor-tasks\/me~fb-task\/run-sync-get-dataset-items/);
+});
+
+test("parseApifySources accepts taskId-based sources", () => {
+  process.env.APIFY_SOURCES = JSON.stringify([{ name: "fb", taskId: "me~fb-task" }]);
+  const cfgs = parseApifySources();
+  assert.equal(cfgs.length, 1);
+  assert.equal(cfgs[0].taskId, "me~fb-task");
+});

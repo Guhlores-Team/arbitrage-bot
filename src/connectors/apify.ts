@@ -22,7 +22,11 @@ import { parsePrice } from "./parse.js";
 
 export interface ApifySourceConfig {
   name: string;
-  actor: string;
+  /** Apify actor id ("user/actor" or "user~actor"). Use this OR taskId. */
+  actor?: string;
+  /** Apify task id — preferred for actors needing saved input (e.g. FB cookies),
+   * so secrets live on Apify, not in your .env. */
+  taskId?: string;
   queryField?: string;
   input?: Record<string, unknown>;
   map?: Partial<Record<"id" | "title" | "price" | "url" | "image" | "location", string>>;
@@ -38,8 +42,12 @@ export class ApifyConnector implements SourceConnector {
   async search(q: SearchQuery): Promise<SourceListing[]> {
     const token = process.env.APIFY_TOKEN;
     if (!token) throw new Error("APIFY_TOKEN not set");
-    const actor = this.cfg.actor.replace("/", "~");
-    const url = `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${token}&timeout=180`;
+    if (!this.cfg.actor && !this.cfg.taskId) throw new Error(`apify source "${this.cfg.name}" needs an actor or taskId`);
+
+    const base = this.cfg.taskId
+      ? `https://api.apify.com/v2/actor-tasks/${this.cfg.taskId}`
+      : `https://api.apify.com/v2/acts/${this.cfg.actor!.replace("/", "~")}`;
+    const url = `${base}/run-sync-get-dataset-items?token=${token}&timeout=180`;
 
     const input = {
       [this.cfg.queryField ?? "search"]: q.query,
@@ -52,7 +60,7 @@ export class ApifyConnector implements SourceConnector {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     });
-    if (!res.ok) throw new Error(`apify ${this.cfg.actor} ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    if (!res.ok) throw new Error(`apify ${this.cfg.taskId ?? this.cfg.actor} ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const items = (await res.json()) as any[];
     if (!Array.isArray(items)) return [];
 
@@ -98,7 +106,7 @@ export function parseApifySources(): ApifySourceConfig[] {
   try {
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return [];
-    return arr.filter((c) => c && typeof c.name === "string" && typeof c.actor === "string");
+    return arr.filter((c) => c && typeof c.name === "string" && (typeof c.actor === "string" || typeof c.taskId === "string"));
   } catch {
     return [];
   }
