@@ -13,27 +13,65 @@ so new sources slot in without touching the engine.
 
 ## What's included
 
+- **Web dashboard** — run scans, pick a source, tune thresholds, and browse
+  scored opportunities (thumbnails, net profit, margin, flags). Zero-dep server.
 - **Craigslist source connector** — uses Craigslist's built-in RSS feed. No
   login, no headless browser. The lowest-friction first source.
+- **Facebook Marketplace source connector** — browser-driven (Playwright) with a
+  persistent logged-in session and **anti-detection hardening** (see below).
+  Optional dependency; the rest of the engine runs without it.
 - **eBay comp connector** — real OAuth + Marketplace Insights request shape,
   with a mock-comps fallback so the pipeline runs before you're approved for
   sold-data access.
 - **Vision + text identification** — Claude reads the listing photos to identify
-  the product when the title is useless ("box of tools $40").
+  the product when the title is useless ("box of tools $40"). Falls back to a
+  title-only heuristic when no `ANTHROPIC_API_KEY` is set.
 - **Retrieve-then-rerank matching** — canonical-code fast path, LLM verification
-  for the rest, with verdict caching.
+  for the rest, with verdict caching (offline token-overlap fallback).
 - **Honest margin math** — eBay final value fee + shipping + returns reserve.
 - **Opportunity scoring** with tunable thresholds.
+- **`demo` source** — deterministic offline listings so the dashboard works
+  instantly with no keys, network, or browser.
 
 ## Quick start
 
 ```bash
 npm install
-cp .env.example .env        # add ANTHROPIC_API_KEY; eBay stays in mock mode
-npm run run -- "nintendo switch" 150
+npm run dashboard           # → http://localhost:3000, pick the "demo" source
 ```
 
-Runs end to end on mock comps so you can see the output shape immediately.
+The dashboard runs end to end with **no setup** on the `demo` source + mock eBay
+comps (identify/match drop to offline heuristics without an API key). Add
+`ANTHROPIC_API_KEY` to turn on real vision identification.
+
+CLI equivalent:
+
+```bash
+npm run run -- "nintendo switch" 150                  # craigslist (default)
+npm run run -- "nintendo switch" 150 --source=demo    # offline demo
+npm run run -- "nintendo switch" 150 --source=facebook
+```
+
+## Facebook Marketplace (scrape-with-safeguards)
+
+Marketplace has no public API or feed, so this source drives a real browser:
+
+```bash
+npm i playwright && npx playwright install chromium   # optional dep
+FACEBOOK_HEADFUL=true npm run fb:login                # sign in once; cookies persist
+npm run run -- "nintendo switch" 200 --source=facebook
+```
+
+**Anti-detection** (`src/connectors/stealth.ts`): per-run desktop-Chrome
+fingerprint (UA/viewport/locale/timezone), `navigator.webdriver` removal, plugin
+& permissions patches, and human-paced scroll/mouse with randomized delays.
+
+**Safeguards**: one tab at a time, throttled actions, capped scrolling, result
+limit, early stop when results dry up. Scraping Marketplace **violates Meta's
+ToS** and risks account/IP bans — keep volume to personal-research scale.
+
+Config (env): `FACEBOOK_USER_DATA_DIR` (default `.fb-session`, gitignored),
+`FACEBOOK_MARKETPLACE_LOCATION` (e.g. `nyc`, `sfbay`), `FACEBOOK_HEADFUL`.
 
 ## Wiring real data
 

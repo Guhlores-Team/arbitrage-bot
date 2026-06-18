@@ -2,7 +2,7 @@ import type { CompConnector, SourceConnector, SearchQuery } from "./connectors/c
 import { identifyProduct } from "./extraction/identify.js";
 import { verifyMatches } from "./matching/match.js";
 import { computeMargin } from "./valuation/value.js";
-import { scoreOpportunity, THRESHOLDS } from "./scoring/score.js";
+import { scoreOpportunity, THRESHOLDS, type Thresholds } from "./scoring/score.js";
 import type { Opportunity } from "./types.js";
 
 export interface PipelineOpts {
@@ -10,6 +10,8 @@ export interface PipelineOpts {
   hardPriceCap?: number;
   /** only run LLM identify when there's a plausible gap vs a quick price guess */
   identifyConfidenceFloor?: number;
+  /** override scoring thresholds (dashboard tuning); defaults to env THRESHOLDS */
+  thresholds?: Thresholds;
 }
 
 /**
@@ -52,13 +54,16 @@ export async function runPipeline(
     const margin = computeMargin(listing.price, matchedComps, identity.category);
 
     // 5. score
-    const { score, passes, flags } = scoreOpportunity({
-      margin,
-      matchConfidence,
-      identityConfidence: identity.confidence,
-      compCount: matchedComps.length,
-      buyCostKnown: listing.price > 0,
-    });
+    const { score, passes, flags } = scoreOpportunity(
+      {
+        margin,
+        matchConfidence,
+        identityConfidence: identity.confidence,
+        compCount: matchedComps.length,
+        buyCostKnown: listing.price > 0,
+      },
+      opts.thresholds ?? THRESHOLDS,
+    );
 
     opportunities.push({
       sourceListing: listing,

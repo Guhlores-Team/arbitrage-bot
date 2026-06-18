@@ -14,6 +14,10 @@ const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
  * the same listing.
  */
 export async function identifyProduct(listing: SourceListing): Promise<ProductIdentity> {
+  // No API key → run a heuristic identity so the pipeline (and dashboard) still
+  // work offline. Lower confidence reflects that no vision/LLM pass happened.
+  if (!process.env.ANTHROPIC_API_KEY) return heuristicIdentity(listing);
+
   const imageBlocks = await buildImageBlocks(listing.imageUrls.slice(0, 4));
 
   const system =
@@ -66,6 +70,30 @@ Return JSON with exactly these fields:
     // fall back to raw title so the pipeline keeps moving
     return { condition: "unknown", confidence: 0, searchString: listing.rawTitle };
   }
+}
+
+/**
+ * Title-only product identity used when no ANTHROPIC_API_KEY is set. Strips the
+ * common local-listing noise so the search string is comp-able, and guesses
+ * condition from obvious phrases. Confidence stays modest on purpose.
+ */
+function heuristicIdentity(listing: SourceListing): ProductIdentity {
+  const t = listing.rawTitle.toLowerCase();
+  const condition =
+    /sealed|brand new|bnib/.test(t) ? "new" :
+    /like new|mint|barely/.test(t) ? "like_new" :
+    /for parts|broken|repair|not working/.test(t) ? "for_parts" :
+    /fair|scratched|cracked/.test(t) ? "fair" :
+    /good|used|gently/.test(t) ? "good" : "unknown";
+
+  const searchString = listing.rawTitle
+    .replace(/[—-].*$/, "") // drop trailing " — like new in box" style suffixes
+    .replace(/\b(obo|cash only|must go|moving sale|local pickup|firm|price|new|used|like new|barely used|sealed|bundle|w\/|with)\b/gi, "")
+    .replace(/[()|$0-9,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim() || listing.rawTitle;
+
+  return { condition, confidence: 0.4, searchString };
 }
 
 async function buildImageBlocks(urls: string[]): Promise<Anthropic.ImageBlockParam[]> {

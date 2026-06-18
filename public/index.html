@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Arbitrage Engine — Dashboard</title>
+<style>
+  :root {
+    --bg: #0b0f17; --panel: #131a26; --panel-2: #18212f; --line: #243044;
+    --text: #e7edf5; --muted: #8a98ad; --accent: #4f9dff; --good: #36d399;
+    --bad: #ff6b6b; --warn: #f6c453; --chip: #1d2735;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: radial-gradient(1200px 600px at 70% -10%, #16233a 0%, var(--bg) 55%);
+    color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  header { padding: 22px 28px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 14px; }
+  header h1 { font-size: 19px; margin: 0; letter-spacing: .2px; }
+  header .tag { color: var(--muted); font-size: 13px; }
+  .mode { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .mode b { color: var(--warn); }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 28px 64px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  form.search { display: grid; grid-template-columns: 1fr 130px 150px auto; gap: 12px; align-items: end; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  input, select {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 10px; padding: 11px 12px; font-size: 14px; outline: none;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  button.go {
+    background: linear-gradient(180deg, #5aa6ff, #2f7fe0); color: #fff; border: 0; cursor: pointer;
+    border-radius: 10px; padding: 12px 22px; font-weight: 600; font-size: 14px; height: 44px;
+  }
+  button.go:disabled { opacity: .6; cursor: default; }
+
+  details.tuning { margin-top: 14px; }
+  details.tuning summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .sliders { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 14px; }
+  .sliders .val { color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type=range] { padding: 0; accent-color: var(--accent); }
+
+  .summary { display: flex; gap: 22px; margin: 22px 2px 14px; color: var(--muted); font-size: 13px; align-items: center; }
+  .summary b { color: var(--text); }
+  .summary .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .card.pass { border-color: #2a5a45; }
+  .card .thumb { height: 150px; background: #0d131d center/cover no-repeat; position: relative; }
+  .card .thumb .badge {
+    position: absolute; top: 10px; left: 10px; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  }
+  .badge.pass { background: rgba(54,211,153,.18); color: var(--good); border: 1px solid rgba(54,211,153,.4); }
+  .badge.fail { background: rgba(255,107,107,.15); color: var(--bad); border: 1px solid rgba(255,107,107,.4); }
+  .card .thumb .score {
+    position: absolute; bottom: 10px; right: 10px; width: 46px; height: 46px; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 700; font-size: 14px; background: #0d131dcc; backdrop-filter: blur(3px);
+  }
+  .card .body { padding: 14px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .card .title { font-weight: 600; font-size: 14px; line-height: 1.35; }
+  .card .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .figs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .fig { background: var(--panel-2); border-radius: 9px; padding: 8px 10px; }
+  .fig .k { color: var(--muted); font-size: 11px; }
+  .fig .v { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .v.net-pos { color: var(--good); } .v.net-neg { color: var(--bad); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: var(--chip); border: 1px solid var(--line); color: var(--muted); font-size: 11px; padding: 3px 8px; border-radius: 999px; }
+  .chip.flag { color: var(--warn); border-color: #4a3f1f; background: #251f10; }
+  .card .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+  .card a.view { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
+  .meterbar { height: 5px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+  .meterbar > span { display: block; height: 100%; background: linear-gradient(90deg, #2f7fe0, #5aa6ff); }
+
+  .state { text-align: center; color: var(--muted); padding: 60px 0; }
+  .spinner { width: 26px; height: 26px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .err { color: var(--bad); }
+  @media (max-width: 720px) { form.search { grid-template-columns: 1fr 1fr; } .sliders { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>⟳ Arbitrage Engine</h1>
+  <span class="tag">source → identify → comp → match → margin → score</span>
+  <span class="mode" id="mode"></span>
+</header>
+
+<main>
+  <section class="panel">
+    <form class="search" id="form">
+      <div>
+        <label for="q">What to hunt for</label>
+        <input id="q" placeholder="e.g. nintendo switch oled" value="nintendo switch" autocomplete="off" />
+      </div>
+      <div>
+        <label for="cap">Max buy price</label>
+        <input id="cap" type="number" min="0" placeholder="any" />
+      </div>
+      <div>
+        <label for="source">Source</label>
+        <select id="source"></select>
+      </div>
+      <button class="go" id="go" type="submit">Scan</button>
+    </form>
+
+    <details class="tuning">
+      <summary>Scoring thresholds</summary>
+      <div class="sliders">
+        <div>
+          <label>Min margin — <span class="val" id="mLbl"></span></label>
+          <input type="range" id="minMargin" min="0" max="0.8" step="0.05" />
+        </div>
+        <div>
+          <label>Min net profit — <span class="val" id="pLbl"></span></label>
+          <input type="range" id="minProfit" min="0" max="200" step="5" />
+        </div>
+        <div>
+          <label>Min match confidence — <span class="val" id="cLbl"></span></label>
+          <input type="range" id="minConf" min="0" max="1" step="0.05" />
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <div class="summary" id="summary" hidden></div>
+  <div id="results"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let config = { thresholds: { minMarginPct: .25, minAbsoluteProfit: 20, minMatchConfidence: .8 } };
+
+async function loadConfig() {
+  config = await (await fetch("/api/config")).json();
+  const sel = $("source");
+  sel.innerHTML = config.sources.map((s) => `<option value="${s}">${s}</option>`).join("");
+  sel.value = config.sources.includes("demo") ? "demo" : config.sources[0];
+
+  $("minMargin").value = config.thresholds.minMarginPct;
+  $("minProfit").value = config.thresholds.minAbsoluteProfit;
+  $("minConf").value = config.thresholds.minMatchConfidence;
+  syncLabels();
+
+  const bits = [];
+  bits.push(config.hasAnthropicKey ? "AI identify: <b style='color:var(--good)'>on</b>" : "AI identify: <b>offline heuristic</b>");
+  bits.push(config.ebayMockComps ? "eBay comps: <b>mock</b>" : "eBay comps: <b style='color:var(--good)'>live</b>");
+  $("mode").innerHTML = bits.join(" &nbsp;·&nbsp; ");
+}
+
+function syncLabels() {
+  $("mLbl").textContent = Math.round($("minMargin").value * 100) + "%";
+  $("pLbl").textContent = "$" + $("minProfit").value;
+  $("cLbl").textContent = Math.round($("minConf").value * 100) + "%";
+}
+["minMargin", "minProfit", "minConf"].forEach((id) => $(id).addEventListener("input", syncLabels));
+
+function scoreColor(s) { return s >= .66 ? "var(--good)" : s >= .4 ? "var(--warn)" : "var(--bad)"; }
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
+
+function card(o) {
+  const netCls = o.net >= 0 ? "net-pos" : "net-neg";
+  const thumb = o.image ? `style="background-image:url('${esc(o.image)}')"` : "";
+  const sub = [o.brand, o.model].filter(Boolean).join(" ") || o.condition;
+  const flags = (o.flags || []).filter((f) => f !== "DOES NOT PASS THRESHOLDS")
+    .map((f) => `<span class="chip flag">${esc(f)}</span>`).join("");
+  return `
+  <div class="card ${o.passes ? "pass" : ""}">
+    <div class="thumb" ${thumb}>
+      <span class="badge ${o.passes ? "pass" : "fail"}">${o.passes ? "OPPORTUNITY" : "below bar"}</span>
+      <span class="score" style="color:${scoreColor(o.score)}">${o.score.toFixed(2)}</span>
+    </div>
+    <div class="body">
+      <div>
+        <div class="title">${esc(o.title)}</div>
+        <div class="sub">${esc(sub)} · ${esc(o.location || "—")} · ${o.compCount} comps</div>
+      </div>
+      <div class="figs">
+        <div class="fig"><div class="k">Buy</div><div class="v">$${o.buy || "?"}</div></div>
+        <div class="fig"><div class="k">Resale</div><div class="v">$${o.resale}</div></div>
+        <div class="fig"><div class="k">Net</div><div class="v ${netCls}">$${o.net}</div></div>
+      </div>
+      <div class="meterbar"><span style="width:${Math.max(0, Math.min(100, o.marginPct*100)).toFixed(0)}%"></span></div>
+      <div class="chips">
+        <span class="chip">${Math.round(o.marginPct*100)}% margin</span>
+        <span class="chip">match ${Math.round(o.matchConfidence*100)}%</span>
+        <span class="chip">id ${Math.round(o.identityConfidence*100)}%</span>
+        <span class="chip">−$${o.fees} fees</span>
+      </div>
+      ${flags ? `<div class="chips">${flags}</div>` : ""}
+      <div class="foot">
+        <span class="sub">${esc(o.condition)}</span>
+        <a class="view" href="${esc(o.url)}" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function run(e) {
+  e.preventDefault();
+  const go = $("go"); go.disabled = true; go.textContent = "Scanning…";
+  $("results").innerHTML = `<div class="state"><div class="spinner"></div>Pulling listings, comping, scoring…</div>`;
+  $("summary").hidden = true;
+  try {
+    const res = await fetch("/api/search", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: $("q").value, source: $("source").value,
+        maxPrice: $("cap").value || undefined,
+        thresholds: {
+          minMarginPct: Number($("minMargin").value),
+          minAbsoluteProfit: Number($("minProfit").value),
+          minMatchConfidence: Number($("minConf").value),
+        },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "request failed");
+    render(data);
+  } catch (err) {
+    $("results").innerHTML = `<div class="state err">⚠ ${esc(err.message)}</div>`;
+  } finally {
+    go.disabled = false; go.textContent = "Scan";
+  }
+}
+
+function render(data) {
+  const m = data.meta;
+  $("summary").hidden = false;
+  $("summary").innerHTML =
+    `<span><span class="dot" style="background:var(--good)"></span><b>${m.passing}</b> opportunities</span>` +
+    `<span><b>${m.count}</b> scanned</span>` +
+    `<span>source <b>${esc(m.source)}</b></span>` +
+    `<span>${m.tookMs} ms</span>`;
+  if (!data.opportunities.length) {
+    $("results").innerHTML = `<div class="state">No results. Try a broader query or a different source.</div>`;
+    return;
+  }
+  $("results").innerHTML = `<div class="grid">${data.opportunities.map(card).join("")}</div>`;
+}
+
+$("form").addEventListener("submit", run);
+loadConfig();
+</script>
+</body>
+</html>

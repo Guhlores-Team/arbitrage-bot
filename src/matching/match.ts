@@ -35,17 +35,43 @@ export async function verifyMatches(
       continue;
     }
 
-    // Stage 2: LLM verification (cached).
+    // Stage 2: LLM verification (cached). Without an API key, fall back to a
+    // token-overlap heuristic so the pipeline still runs offline.
     const key = `${identity.searchString}::${comp.id}`;
     let verdict = verdictCache.get(key);
     if (!verdict) {
-      verdict = await llmVerify(identity, comp);
+      verdict = process.env.ANTHROPIC_API_KEY
+        ? await llmVerify(identity, comp)
+        : heuristicVerify(identity, comp);
       verdictCache.set(key, verdict);
     }
     if (verdict.isMatch) results.push({ comp, verdict });
   }
 
   return results;
+}
+
+/**
+ * Offline match check: Jaccard token overlap between the search string and the
+ * comp title. Coarse but keyed to the same threshold idea — enough to make the
+ * demo/no-key path produce sensible matches without paying for an LLM.
+ */
+function heuristicVerify(identity: ProductIdentity, comp: SoldComp): MatchVerdict {
+  const tokens = (s: string) =>
+    new Set(s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 1));
+  const a = tokens(identity.searchString);
+  const b = tokens(comp.title);
+  let inter = 0;
+  for (const w of a) if (b.has(w)) inter++;
+  const union = a.size + b.size - inter || 1;
+  const confidence = inter / union;
+  return {
+    isMatch: confidence >= 0.3,
+    confidence,
+    variantMatch: confidence >= 0.6,
+    conditionDelta: 0,
+    reasoning: `token overlap ${(confidence * 100).toFixed(0)}% (offline heuristic)`,
+  };
 }
 
 async function llmVerify(identity: ProductIdentity, comp: SoldComp): Promise<MatchVerdict> {
