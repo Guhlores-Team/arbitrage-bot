@@ -9,6 +9,7 @@ import { parseScanParams, runScan } from "./scan.js";
 import { store } from "./store.js";
 import { notify, notifierStatus, notifyOpportunities } from "./notify.js";
 import { EbayCompConnector } from "./connectors/ebay.js";
+import { health } from "./health.js";
 
 /**
  * Dashboard server. Zero external deps — Node's http only — so it starts with
@@ -57,6 +58,10 @@ const server = createServer(async (req, res) => {
         compSource: new EbayCompConnector().effectiveSource,
         notifiers: notifierStatus(),
       });
+    }
+
+    if (method === "GET" && path === "/api/health") {
+      return json(res, 200, await health());
     }
 
     if (method === "POST" && path === "/api/notify/test") {

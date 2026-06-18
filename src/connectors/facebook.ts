@@ -7,6 +7,7 @@ import {
   humanScroll,
   humanPause,
 } from "./stealth.js";
+import { parseCard, type RawCard } from "./parse.js";
 
 /**
  * Facebook Marketplace source connector.
@@ -109,6 +110,7 @@ export class FacebookConnector implements SourceConnector {
       const now = new Date().toISOString();
       return [...seen.values()]
         .slice(0, limit)
+        .map((raw) => parseCard(raw))
         .map((c): SourceListing => ({
           id: `fb_${c.id}`,
           source: "facebook",
@@ -135,48 +137,39 @@ export class FacebookConnector implements SourceConnector {
   }
 
   /**
-   * Pull listing cards from the current DOM. Marketplace markup is obfuscated
-   * and changes often, so we anchor on the one stable thing — item links of the
-   * form /marketplace/item/<id>/ — and read text/image relative to each. The
-   * callback below runs in the browser, so it's plain JS with no Node types.
+   * Pull raw listing cards from the current DOM. Marketplace markup is
+   * obfuscated and changes often, so we anchor on the one stable thing — item
+   * links of the form /marketplace/item/<id>/ — and collect the visible text
+   * fragments + image attrs per card. All the messy price/title/location
+   * parsing happens Node-side in parse.ts (so it's testable). The callback
+   * below runs in the browser, so it's plain JS with no Node types.
    */
   private async extractCards(page: FbPage): Promise<RawCard[]> {
     return page.$$eval('a[href*="/marketplace/item/"]', (anchors: any[]): RawCard[] => {
-      const parsePrice = (t: string): number => {
-        const m = t.match(/\$\s?([\d,]+)/);
-        return m ? Number(m[1].replace(/,/g, "")) : 0;
-      };
       const out: RawCard[] = [];
       for (const a of anchors) {
         const href = String(a.href).split("?")[0];
         const idMatch = href.match(/\/marketplace\/item\/(\d+)/);
         if (!idMatch) continue;
-        const text = (a.textContent ?? "").replace(/\s+/g, " ").trim();
-        if (!text) continue;
+        const spans = Array.from(a.querySelectorAll("span")) as any[];
+        let texts = spans.map((s) => (s.textContent ?? "").trim()).filter(Boolean);
+        if (!texts.length) {
+          const t = (a.textContent ?? "").trim();
+          if (t) texts = [t];
+        }
+        if (!texts.length) continue;
         const img = a.querySelector("img");
-        // Card text is roughly: "$PRICE Title Location". Strip the leading price.
-        const title = text.replace(/^\$[\d,]+\s*/, "").slice(0, 140);
         out.push({
           id: idMatch[1],
           url: href,
-          title,
-          price: parsePrice(text),
-          image: img ? img.getAttribute("src") || undefined : undefined,
-          location: undefined,
+          texts,
+          src: img ? img.getAttribute("src") || undefined : undefined,
+          srcset: img ? img.getAttribute("srcset") || undefined : undefined,
         });
       }
       return out;
     });
   }
-}
-
-interface RawCard {
-  id: string;
-  url: string;
-  title: string;
-  price: number;
-  image?: string;
-  location?: string;
 }
 
 // --- Playwright loaded lazily so it stays an optional dependency. ---

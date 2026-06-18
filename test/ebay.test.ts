@@ -39,12 +39,25 @@ test("browse mode maps active itemSummaries to comps", async () => {
       };
     throw new Error("unexpected " + url);
   });
-  const c = new EbayCompConnector("id", "secret", false, "browse");
+  const c = new EbayCompConnector("id", "secret", false, "browse", 1); // no haircut here
   assert.equal(c.effectiveSource, "browse");
   const comps = await c.getSoldComps("switch", 10);
   assert.equal(comps.length, 1); // the priceless one is dropped
-  assert.equal(comps[0].soldPrice, 299.99);
+  assert.equal(comps[0].soldPrice, 300); // 299.99 rounded
   assert.equal(comps[0].condition, "new");
+});
+
+test("browse applies the ask->sold haircut", async () => {
+  stub((url) => {
+    if (url.includes("/oauth2/token")) return TOKEN_JSON;
+    if (url.includes("item_summary/search"))
+      return { itemSummaries: [{ itemId: "v1", title: "x", price: { value: "100" }, condition: "Good", itemWebUrl: "u" }] };
+    throw new Error("unexpected " + url);
+  });
+  // ratio 0.8 -> 100 ask becomes 80 sold estimate
+  const c = new EbayCompConnector("id", "secret", false, "browse", 0.8);
+  const comps = await c.getSoldComps("x", 5);
+  assert.equal(comps[0].soldPrice, 80);
 });
 
 test("auto falls back from insights to browse when insights fails", async () => {
@@ -57,7 +70,7 @@ test("auto falls back from insights to browse when insights fails", async () => 
     throw new Error("unexpected " + url);
   }) as typeof fetch;
 
-  const c = new EbayCompConnector("id", "secret", false, "auto");
+  const c = new EbayCompConnector("id", "secret", false, "auto", 1); // no haircut here
   const comps = await c.getSoldComps("thing", 5);
   assert.equal(comps.length, 1);
   assert.equal(comps[0].soldPrice, 50);

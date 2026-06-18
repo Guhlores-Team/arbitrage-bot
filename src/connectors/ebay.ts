@@ -26,6 +26,9 @@ export class EbayCompConnector implements CompConnector {
     private clientSecret = process.env.EBAY_CLIENT_SECRET ?? "",
     private useMock = (process.env.EBAY_USE_MOCK_COMPS ?? "true") === "true",
     private compSource: CompSource = (process.env.EBAY_COMP_SOURCE as CompSource) ?? "auto",
+    // Browse returns ACTIVE asks, which sit above realized sale prices. Discount
+    // them toward a likely sold value so margins aren't fantasy. Tune per market.
+    private browseAskToSold = clamp01(Number(process.env.EBAY_BROWSE_ASK_TO_SOLD ?? 0.9)),
   ) {}
 
   /** Which comp source this instance will actually use, for display/debugging. */
@@ -119,15 +122,18 @@ export class EbayCompConnector implements CompConnector {
     if (!res.ok) throw new Error(`ebay browse ${res.status}: ${await res.text()}`);
     const json: any = await res.json();
     return (json.itemSummaries ?? [])
-      .map((s: any): SoldComp => ({
-        id: s.itemId,
-        title: s.title,
-        // Browse returns ASKING prices, not solds — a rougher comp by nature.
-        soldPrice: Number(s.price?.value ?? 0),
-        currency: s.price?.currency ?? "USD",
-        condition: mapEbayCondition(s.condition),
-        url: s.itemWebUrl,
-      }))
+      .map((s: any): SoldComp => {
+        // Browse returns ASKING prices; discount toward a likely sold value.
+        const ask = Number(s.price?.value ?? 0);
+        return {
+          id: s.itemId,
+          title: s.title,
+          soldPrice: Math.round(ask * this.browseAskToSold),
+          currency: s.price?.currency ?? "USD",
+          condition: mapEbayCondition(s.condition),
+          url: s.itemWebUrl,
+        };
+      })
       .filter((c: SoldComp) => c.soldPrice > 0);
   }
 
@@ -169,4 +175,8 @@ function hash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return h;
+}
+
+function clamp01(n: number): number {
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.9;
 }

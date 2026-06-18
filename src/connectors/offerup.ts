@@ -1,6 +1,7 @@
 import type { SourceListing } from "../types.js";
 import type { SearchQuery, SourceConnector } from "./connector.js";
 import { pickFingerprint, contextOptions, STEALTH_INIT_SCRIPT, humanScroll, humanPause } from "./stealth.js";
+import { parseCard, type RawCard } from "./parse.js";
 
 /**
  * OfferUp source connector — the realistic "local app" second source.
@@ -78,6 +79,7 @@ export class OfferUpConnector implements SourceConnector {
       const now = new Date().toISOString();
       return [...seen.values()]
         .slice(0, limit)
+        .map((raw) => parseCard(raw))
         .map((c): SourceListing => ({
           id: `ou_${c.id}`,
           source: "offerup",
@@ -95,42 +97,36 @@ export class OfferUpConnector implements SourceConnector {
     }
   }
 
-  /** Anchor on item-detail links; read price/title/image relative to each. */
+  /**
+   * Anchor on item-detail links; collect raw text fragments + image attrs per
+   * card. Price/title/location parsing happens Node-side in parse.ts.
+   */
   private async extractCards(page: any): Promise<RawCard[]> {
     return page.$$eval('a[href*="/item/detail/"]', (anchors: any[]): RawCard[] => {
-      const parsePrice = (t: string): number => {
-        const m = t.match(/\$\s?([\d,]+)/);
-        return m ? Number(m[1].replace(/,/g, "")) : 0;
-      };
       const out: RawCard[] = [];
       for (const a of anchors) {
         const href = String(a.href).split("?")[0];
         const idMatch = href.match(/\/item\/detail\/([\w-]+)/);
         if (!idMatch) continue;
-        const text = (a.textContent ?? "").replace(/\s+/g, " ").trim();
-        if (!text) continue;
+        const spans = Array.from(a.querySelectorAll("span")) as any[];
+        let texts = spans.map((s) => (s.textContent ?? "").trim()).filter(Boolean);
+        if (!texts.length) {
+          const t = (a.textContent ?? "").trim();
+          if (t) texts = [t];
+        }
+        if (!texts.length) continue;
         const img = a.querySelector("img");
         out.push({
           id: idMatch[1],
           url: href,
-          title: text.replace(/^\$[\d,]+\s*/, "").slice(0, 140),
-          price: parsePrice(text),
-          image: img ? img.getAttribute("src") || undefined : undefined,
-          location: undefined,
+          texts,
+          src: img ? img.getAttribute("src") || undefined : undefined,
+          srcset: img ? img.getAttribute("srcset") || undefined : undefined,
         });
       }
       return out;
     });
   }
-}
-
-interface RawCard {
-  id: string;
-  url: string;
-  title: string;
-  price: number;
-  image?: string;
-  location?: string;
 }
 
 async function loadChromium(): Promise<any> {
