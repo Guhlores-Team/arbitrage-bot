@@ -48,3 +48,29 @@ test("parseCard tolerates a single concatenated text blob", () => {
   assert.equal(c.price, 200);
   assert.ok(c.title.includes("Dyson"));
 });
+
+test("parseCard prefers aria-label / img alt over span soup (real OfferUp shape)", () => {
+  // exactly the DOM shape OfferUp serves: a concatenated blob span + clean spans
+  const c = parseCard({
+    id: "4",
+    url: "https://offerup.com/item/detail/abc",
+    texts: ["Minecraft for Nintendo Switch$25Bennington, NE", "Minecraft for Nintendo Switch", "$25", "$25", "Bennington, NE"],
+    ariaLabel: "Minecraft for Nintendo Switch $25  in Bennington, NE ",
+    imgAlt: "Minecraft for Nintendo Switch",
+  });
+  assert.equal(c.title, "Minecraft for Nintendo Switch"); // not the garbled blob
+  assert.equal(c.price, 25);
+  assert.equal(c.location, "Bennington, NE");
+});
+
+test("parseCard derives title + location from aria-label when no img alt", () => {
+  const c = parseCard({
+    id: "5",
+    url: "u",
+    texts: ["$450", "Omaha, NE"],
+    ariaLabel: "Nintendo switch  $450  in Omaha, NE ",
+  });
+  assert.equal(c.title, "Nintendo switch");
+  assert.equal(c.price, 450);
+  assert.equal(c.location, "Omaha, NE");
+});

@@ -58,8 +58,26 @@ npm run run -- "nintendo switch" 150                  # craigslist (default)
 npm run run -- "nintendo switch" 150 --source=demo    # offline demo
 npm run run -- "nintendo switch" 150 --source=facebook
 npm run run -- "nintendo switch" 150 --source=offerup
+npm run doctor                                        # live self-test of every source
 npm test                                              # node:test suite
 ```
+
+## Will scraping work here? Run the doctor
+
+```bash
+npm run doctor                 # checks keys, sessions, comps + does a live probe
+npm run doctor offerup         # probe just one source
+```
+
+It reports, per source, whether a live scrape succeeds and — if not — *why*:
+network/TLS, an anti-bot **block**, **login required**, or just **empty/changed
+markup** (the connectors detect these and fail loudly instead of returning an
+empty list silently).
+
+**Reality check:** these sources actively block automation from **datacenter /
+cloud IPs** (you'll see `403`/challenge pages). Scraping is far more reliable
+from a **residential IP with a real, logged-in browser** — i.e. your own
+machine. Behind a TLS-intercepting proxy, set `SCRAPER_IGNORE_HTTPS_ERRORS=true`.
 
 ## Saved feed, watchlists & alerts
 

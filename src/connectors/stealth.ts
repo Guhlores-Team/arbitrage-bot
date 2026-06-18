@@ -57,12 +57,29 @@ export function contextOptions(fp: Fingerprint, headless: boolean) {
     viewport: fp.viewport,
     locale: fp.locale,
     timezoneId: fp.timezoneId,
+    // Opt-in for users behind a TLS-intercepting proxy (corporate / some cloud).
+    ignoreHTTPSErrors: (process.env.SCRAPER_IGNORE_HTTPS_ERRORS ?? "false") === "true",
     // Chrome flags that remove the most obvious automation tells.
     args: [
       "--disable-blink-features=AutomationControlled",
       "--disable-features=IsolateOrigins,site-per-process",
     ],
   };
+}
+
+/** Navigate with a few retries + backoff; transient nav failures are common. */
+export async function gotoWithRetry(page: any, url: string, opts: any = {}, tries = 3): Promise<void> {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      await page.goto(url, { waitUntil: "domcontentloaded", ...opts });
+      return;
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 /**

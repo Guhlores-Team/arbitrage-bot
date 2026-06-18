@@ -1,7 +1,8 @@
 import type { SourceListing } from "../types.js";
 import type { SearchQuery, SourceConnector } from "./connector.js";
-import { pickFingerprint, contextOptions, STEALTH_INIT_SCRIPT, humanScroll, humanPause } from "./stealth.js";
+import { pickFingerprint, contextOptions, STEALTH_INIT_SCRIPT, humanScroll, humanPause, gotoWithRetry } from "./stealth.js";
 import { parseCard, type RawCard } from "./parse.js";
+import { classifyPage } from "./diagnose.js";
 
 /**
  * OfferUp source connector — the realistic "local app" second source.
@@ -53,6 +54,7 @@ export class OfferUpConnector implements SourceConnector {
         viewport: fp.viewport,
         locale: fp.locale,
         timezoneId: fp.timezoneId,
+        ignoreHTTPSErrors: opts.ignoreHTTPSErrors,
       });
       await ctx.addInitScript(STEALTH_INIT_SCRIPT);
       const page = await ctx.newPage();
@@ -60,7 +62,7 @@ export class OfferUpConnector implements SourceConnector {
 
       const params = new URLSearchParams({ q: q.query });
       if (q.maxPrice) params.set("price_max", String(q.maxPrice));
-      await page.goto(`https://offerup.com/search?${params.toString()}`, { waitUntil: "domcontentloaded" });
+      await gotoWithRetry(page, `https://offerup.com/search?${params.toString()}`, { timeout: this.cfg.navTimeoutMs });
       await humanPause(...this.cfg.delayMs);
 
       const seen = new Map<string, RawCard>();
@@ -74,6 +76,12 @@ export class OfferUpConnector implements SourceConnector {
         if (stale >= 2) break;
         await humanScroll(page);
         await humanPause(...this.cfg.delayMs);
+      }
+
+      if (seen.size === 0) {
+        const body: string = await page.evaluate("document.body ? document.body.innerText.slice(0, 4000) : ''");
+        const dx = classifyPage(page.url(), 0, body);
+        if (dx.state !== "empty") throw new Error(`offerup scrape: ${dx.state} — ${dx.detail}`);
       }
 
       const now = new Date().toISOString();
@@ -122,6 +130,8 @@ export class OfferUpConnector implements SourceConnector {
           texts,
           src: img ? img.getAttribute("src") || undefined : undefined,
           srcset: img ? img.getAttribute("srcset") || undefined : undefined,
+          ariaLabel: a.getAttribute("aria-label") || undefined,
+          imgAlt: img ? img.getAttribute("alt") || undefined : undefined,
         });
       }
       return out;

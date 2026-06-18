@@ -6,8 +6,10 @@ import {
   STEALTH_INIT_SCRIPT,
   humanScroll,
   humanPause,
+  gotoWithRetry,
 } from "./stealth.js";
 import { parseCard, type RawCard } from "./parse.js";
+import { classifyPage } from "./diagnose.js";
 
 /**
  * Facebook Marketplace source connector.
@@ -82,7 +84,7 @@ export class FacebookConnector implements SourceConnector {
       page.setDefaultNavigationTimeout(this.cfg.navTimeoutMs);
 
       const url = this.buildSearchUrl(q);
-      await page.goto(url, { waitUntil: "domcontentloaded" });
+      await gotoWithRetry(page, url, { timeout: this.cfg.navTimeoutMs });
       await humanPause(...this.cfg.delayMs);
 
       // Login wall detection: Marketplace bounces logged-out sessions to /login.
@@ -105,6 +107,14 @@ export class FacebookConnector implements SourceConnector {
         if (stale >= 2) break;
         await humanScroll(page);
         await humanPause(...this.cfg.delayMs);
+      }
+
+      // If we got nothing, say why (login wall / anti-bot / changed markup)
+      // instead of silently returning an empty list.
+      if (seen.size === 0) {
+        const body: string = await page.evaluate("document.body ? document.body.innerText.slice(0, 4000) : ''");
+        const dx = classifyPage(page.url(), 0, body);
+        if (dx.state !== "empty") throw new Error(`facebook scrape: ${dx.state} — ${dx.detail}`);
       }
 
       const now = new Date().toISOString();
@@ -165,6 +175,8 @@ export class FacebookConnector implements SourceConnector {
           texts,
           src: img ? img.getAttribute("src") || undefined : undefined,
           srcset: img ? img.getAttribute("srcset") || undefined : undefined,
+          ariaLabel: a.getAttribute("aria-label") || undefined,
+          imgAlt: img ? img.getAttribute("alt") || undefined : undefined,
         });
       }
       return out;

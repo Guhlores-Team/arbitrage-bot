@@ -16,6 +16,10 @@ export interface RawCard {
   /** img src / srcset as found, for best-image selection */
   src?: string;
   srcset?: string;
+  /** anchor aria-label, often "Title  $Price  in City, ST" — the best signal */
+  ariaLabel?: string;
+  /** img alt text, often a clean product title */
+  imgAlt?: string;
 }
 
 export interface ParsedCard {
@@ -44,7 +48,6 @@ function looksLikeLocation(t: string): boolean {
   return /,\s*[A-Z][a-zA-Z]/.test(t);
 }
 
-const PURE_PRICE = /^(free|\$\s?[\d,]+(?:\.\d{1,2})?)$/i;
 const LEADING_PRICE = /^\s*(free|\$\s?[\d,]+(?:\.\d{1,2})?)\s+/i;
 
 /** Pick the highest-resolution image from a srcset, else fall back to src. */
@@ -69,34 +72,51 @@ export function pickImage(src?: string, srcset?: string): string | undefined {
  *   title   = longest non-price, non-location fragment
  *   location= a "City, ST"-looking fragment, else the last short non-title text
  */
+/** "Title  $Price  in City, ST" -> title (everything before the price). */
+function titleFromAria(aria?: string): string | undefined {
+  if (!aria) return undefined;
+  const t = aria.replace(/\s+/g, " ").trim();
+  const cut = t.split(/\s+(?=\$|free\b)/i)[0].trim();
+  return cut || undefined;
+}
+
+/** "… in City, ST" -> "City, ST". */
+function locationFromAria(aria?: string): string | undefined {
+  const m = aria?.replace(/\s+/g, " ").match(/\bin\s+([A-Za-z .'\-]+,\s*[A-Z]{2})\s*$/);
+  return m ? m[1].trim() : undefined;
+}
+
 export function parseCard(raw: RawCard): ParsedCard {
   const texts = raw.texts.map((t) => t.replace(/\s+/g, " ").trim()).filter(Boolean);
 
-  // Pull the price from a price-only fragment or a "$X Title…" blob, and keep
-  // the remaining text as title/location candidates.
+  // Price: trust pure-price fragments / the aria-label first, then a "$X Title"
+  // blob's leading price.
   let price = 0;
-  const parts: string[] = [];
-  for (const t of texts) {
-    if (PURE_PRICE.test(t)) {
-      if (!price) price = parsePrice(t);
-      continue;
-    }
-    const lead = t.match(LEADING_PRICE);
-    if (lead) {
-      if (!price) price = parsePrice(lead[1]);
-      const rest = t.slice(lead[0].length).trim();
-      if (rest) parts.push(rest);
-    } else {
-      parts.push(t);
+  for (const t of [...texts, raw.ariaLabel ?? ""]) {
+    if (/\$|^free\b/i.test(t)) {
+      price = parsePrice(t.match(LEADING_PRICE)?.[1] ?? t);
+      if (price > 0 || /^free\b/i.test(t.trim())) break;
     }
   }
 
-  const location = parts.find(looksLikeLocation);
-  const titleCandidates = parts.filter((t) => t !== location);
-  const title =
-    titleCandidates.sort((a, b) => b.length - a.length)[0]?.slice(0, 140) ||
-    parts[0]?.slice(0, 140) ||
-    "(untitled)";
+  // Title: prefer the clean structured signals (img alt, aria-label), then a
+  // span with no "$" in it (the concatenated blob always contains the merged
+  // price, so excluding "$" drops it), then a leading-price strip as last resort.
+  const cleanSpans = texts.filter((t) => !t.includes("$") && !looksLikeLocation(t));
+  const blobTitle = (() => {
+    const blob = texts.find((t) => LEADING_PRICE.test(t));
+    return blob?.replace(LEADING_PRICE, "").trim();
+  })();
+  const title = (
+    (raw.imgAlt && raw.imgAlt.trim()) ||
+    titleFromAria(raw.ariaLabel) ||
+    cleanSpans.sort((a, b) => b.length - a.length)[0] ||
+    blobTitle ||
+    texts[0] ||
+    "(untitled)"
+  ).slice(0, 140);
+
+  const location = locationFromAria(raw.ariaLabel) || texts.find(looksLikeLocation);
 
   return { id: raw.id, url: raw.url, title, price, location, image: pickImage(raw.src, raw.srcset) };
 }
