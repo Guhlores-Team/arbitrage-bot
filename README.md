@@ -128,6 +128,12 @@ It applies to Playwright (Facebook/OfferUp/Mercari) and the Craigslist feed; the
 eBay/OpenRouter API calls stay direct. Behind a TLS-intercepting proxy, also set
 `SCRAPER_IGNORE_HTTPS_ERRORS=true`.
 
+Some sources (OfferUp/Mercari) return *more* on a direct IP, while others
+(Craigslist/Facebook) need the proxy. Scope it per source:
+```bash
+SCRAPER_PROXY_SOURCES=craigslist,facebook   # only these go through the proxy
+```
+
 ## Saved feed, watchlists & alerts
 
 Passing opportunities are persisted to a JSON store (`data/store.json`, gitignored;

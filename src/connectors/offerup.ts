@@ -45,7 +45,7 @@ export class OfferUpConnector implements SourceConnector {
     const chromium = await loadChromium();
     const limit = q.limit ?? 25;
     const fp = pickFingerprint();
-    const opts = contextOptions(fp, !this.cfg.headful);
+    const opts = contextOptions(fp, !this.cfg.headful, "offerup");
     const browser = await chromium.launch({ headless: opts.headless, args: opts.args });
 
     try {

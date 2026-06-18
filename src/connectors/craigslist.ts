@@ -1,7 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import type { SourceListing } from "../types.js";
 import type { SearchQuery, SourceConnector } from "./connector.js";
-import { proxyDispatcher } from "../proxy.js";
+import { scrapeFetch } from "../proxy.js";
 
 /**
  * Craigslist source connector.
@@ -29,10 +29,11 @@ export class CraigslistConnector implements SourceConnector {
     if (q.maxPrice) params.set("max_price", String(q.maxPrice));
     const url = `https://${this.region}.craigslist.org/search/sss?${params.toString()}`;
 
-    const res = await fetch(url, {
-      headers: { "User-Agent": "arbitrage-engine/0.1 (personal research)" },
-      dispatcher: proxyDispatcher(),
-    } as any);
+    const res = await scrapeFetch(
+      url,
+      { headers: { "User-Agent": "arbitrage-engine/0.1 (personal research)" } },
+      "craigslist",
+    );
     if (!res.ok) throw new Error(`craigslist ${res.status} for ${url}`);
     const xml = await res.text();
 
@@ -72,10 +73,11 @@ export class CraigslistConnector implements SourceConnector {
   private async enrichAll(listings: SourceListing[], cap = 20): Promise<void> {
     for (const l of listings.slice(0, cap)) {
       try {
-        const res = await fetch(l.url, {
-          headers: { "User-Agent": "arbitrage-engine/0.1 (personal research)" },
-          dispatcher: proxyDispatcher(),
-        } as any);
+        const res = await scrapeFetch(
+          l.url,
+          { headers: { "User-Agent": "arbitrage-engine/0.1 (personal research)" } },
+          "craigslist",
+        );
         if (!res.ok) continue;
         const html = await res.text();
         l.imageUrls = this.imagesFrom(html);

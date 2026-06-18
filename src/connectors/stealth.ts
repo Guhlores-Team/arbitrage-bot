@@ -51,7 +51,7 @@ export function pickFingerprint(): Fingerprint {
 }
 
 /** Context options that pin the session to the chosen fingerprint. */
-export function contextOptions(fp: Fingerprint, headless: boolean) {
+export function contextOptions(fp: Fingerprint, headless: boolean, source?: string) {
   return {
     headless,
     userAgent: fp.userAgent,
@@ -60,9 +60,8 @@ export function contextOptions(fp: Fingerprint, headless: boolean) {
     timezoneId: fp.timezoneId,
     // Opt-in for users behind a TLS-intercepting proxy (corporate / some cloud).
     ignoreHTTPSErrors: (process.env.SCRAPER_IGNORE_HTTPS_ERRORS ?? "false") === "true",
-    // Route browser traffic through SCRAPER_PROXY if set (residential proxy for
-    // scraping from a datacenter IP). Undefined = direct connection.
-    proxy: playwrightProxy(),
+    // Route browser traffic through SCRAPER_PROXY if enabled for this source.
+    proxy: playwrightProxy(source),
     // Chrome flags that remove the most obvious automation tells.
     args: [
       "--disable-blink-features=AutomationControlled",

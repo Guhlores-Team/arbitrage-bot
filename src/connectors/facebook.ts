@@ -73,7 +73,7 @@ export class FacebookConnector implements SourceConnector {
     const fp = pickFingerprint();
     const ctx = await chromium.launchPersistentContext(
       this.cfg.userDataDir,
-      contextOptions(fp, !this.cfg.headful),
+      contextOptions(fp, !this.cfg.headful, "facebook"),
     );
 
     try {
