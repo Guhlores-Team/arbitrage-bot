@@ -1,7 +1,7 @@
 import "./env.js";
 import { health } from "./health.js";
 import { pickSource } from "./sources.js";
-import { EbayCompConnector } from "./connectors/ebay.js";
+import { buildComper } from "./comps.js";
 
 /**
  * Preflight self-test — run on the machine you'll actually scrape from:
@@ -31,13 +31,15 @@ async function probeSource(name: string): Promise<string> {
 }
 
 async function probeComps(): Promise<string> {
-  const comper = new EbayCompConnector();
+  // Probe the comper the engine actually uses (per COMP_SOURCES/APIFY_COMPS),
+  // so this reflects real wiring — not a hardcoded eBay scraper.
+  const comper = buildComper();
   try {
     const comps = await withTimeout(comper.getSoldComps("nintendo switch oled", 5), 30_000);
     const median = comps.length ? [...comps].map((c) => c.soldPrice).sort((a, b) => a - b)[Math.floor(comps.length / 2)] : 0;
-    return `${ok(comps.length > 0)} eBay comps (${comper.effectiveSource}): ${comps.length} comps, ~$${median} median`;
+    return `${ok(comps.length > 0)} ${comper.market} comps (${comper.basis ?? "?"}): ${comps.length} comps, ~$${median} median`;
   } catch (e: any) {
-    return `${ok(false)} eBay comps (${comper.effectiveSource}): ${e?.message ?? e}`;
+    return `${ok(false)} ${comper.market} comps: ${e?.message ?? e}`;
   }
 }
 
