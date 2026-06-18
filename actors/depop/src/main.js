@@ -47,6 +47,7 @@ const crawler = new PlaywrightCrawler({
     }
     const out = [...seen.values()].slice(0, maxItems).map(parseCard)
       .filter((l) => l.title && (!maxPrice || l.price === 0 || l.price <= maxPrice));
+    if (!out.length) log.warning(`0 Depop items — page "${await page.title()}" at ${page.url()} (anti-bot/markup?).`);
     log.info(`Scraped ${out.length} Depop items for "${query}".`);
     await Actor.pushData(out);
   },

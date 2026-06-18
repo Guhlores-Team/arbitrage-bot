@@ -29,8 +29,9 @@ const startUrl = `https://www.ebay.com/sch/i.html?${params.toString()}`;
 const crawler = new PlaywrightCrawler({
   proxyConfiguration,
   maxRequestsPerCrawl: 1,
-  navigationTimeoutSecs: 60,
-  requestHandlerTimeoutSecs: 180,
+  maxRequestRetries: 1,
+  navigationTimeoutSecs: 45,
+  requestHandlerTimeoutSecs: 90,
   launchContext: { launchOptions: { args: ["--disable-blink-features=AutomationControlled"] } },
   // Block images/media/fonts/CSS to cut residential-proxy bandwidth and runtime.
   preNavigationHooks: [
