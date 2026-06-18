@@ -9,6 +9,7 @@
  *
  * Nothing here defeats login or CAPTCHA; you still sign in by hand once.
  */
+import { playwrightProxy } from "../proxy.js";
 
 export interface Fingerprint {
   userAgent: string;
@@ -59,6 +60,9 @@ export function contextOptions(fp: Fingerprint, headless: boolean) {
     timezoneId: fp.timezoneId,
     // Opt-in for users behind a TLS-intercepting proxy (corporate / some cloud).
     ignoreHTTPSErrors: (process.env.SCRAPER_IGNORE_HTTPS_ERRORS ?? "false") === "true",
+    // Route browser traffic through SCRAPER_PROXY if set (residential proxy for
+    // scraping from a datacenter IP). Undefined = direct connection.
+    proxy: playwrightProxy(),
     // Chrome flags that remove the most obvious automation tells.
     args: [
       "--disable-blink-features=AutomationControlled",

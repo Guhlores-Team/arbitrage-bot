@@ -1,6 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import type { SourceListing } from "../types.js";
 import type { SearchQuery, SourceConnector } from "./connector.js";
+import { proxyDispatcher } from "../proxy.js";
 
 /**
  * Craigslist source connector.
@@ -30,7 +31,8 @@ export class CraigslistConnector implements SourceConnector {
 
     const res = await fetch(url, {
       headers: { "User-Agent": "arbitrage-engine/0.1 (personal research)" },
-    });
+      dispatcher: proxyDispatcher(),
+    } as any);
     if (!res.ok) throw new Error(`craigslist ${res.status} for ${url}`);
     const xml = await res.text();
 
@@ -72,7 +74,8 @@ export class CraigslistConnector implements SourceConnector {
       try {
         const res = await fetch(l.url, {
           headers: { "User-Agent": "arbitrage-engine/0.1 (personal research)" },
-        });
+          dispatcher: proxyDispatcher(),
+        } as any);
         if (!res.ok) continue;
         const html = await res.text();
         l.imageUrls = this.imagesFrom(html);

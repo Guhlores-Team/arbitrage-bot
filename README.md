@@ -117,8 +117,16 @@ empty list silently).
 
 **Reality check:** these sources actively block automation from **datacenter /
 cloud IPs** (you'll see `403`/challenge pages). Scraping is far more reliable
-from a **residential IP with a real, logged-in browser** — i.e. your own
-machine. Behind a TLS-intercepting proxy, set `SCRAPER_IGNORE_HTTPS_ERRORS=true`.
+from a **residential IP**. To scrape from a cloud VM, route through a
+residential/mobile proxy:
+
+```bash
+SCRAPER_PROXY=http://user:pass@host:port   # routes all sources (browser + HTTP)
+```
+
+It applies to Playwright (Facebook/OfferUp/Mercari) and the Craigslist feed; the
+eBay/OpenRouter API calls stay direct. Behind a TLS-intercepting proxy, also set
+`SCRAPER_IGNORE_HTTPS_ERRORS=true`.
 
 ## Saved feed, watchlists & alerts
 

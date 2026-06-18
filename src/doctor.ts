@@ -48,6 +48,7 @@ async function main() {
   console.log(`  Playwright installed : ${ok(h.playwright)}`);
   console.log(`  Identify mode        : ${h.identify}`);
   console.log(`  Comp source          : ${h.comps.source} (${h.comps.note})`);
+  console.log(`  Scraper proxy        : ${h.proxy ? "on (SCRAPER_PROXY)" : "off — datacenter IPs may be blocked"}`);
   console.log(`  Alerts               : ${h.notifiers.any ? "configured" : "off"}`);
   console.log("\n  Static readiness:");
   for (const s of h.sources) console.log(`   ${ok(s.ready)} ${s.source}: ${s.note}`);

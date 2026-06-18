@@ -2,6 +2,7 @@ import { stat, readdir } from "node:fs/promises";
 import { compInfo } from "./comps.js";
 import { notifierStatus } from "./notify.js";
 import { llmInfo } from "./llm.js";
+import { proxyUrl } from "./proxy.js";
 
 /**
  * Preflight: can each source actually run, and is the money path (comps +
@@ -19,12 +20,14 @@ export async function health() {
   const playwright = await hasPlaywright();
   const fbSession = await dirHasFiles(process.env.FACEBOOK_USER_DATA_DIR ?? ".fb-session");
 
+  const proxied = Boolean(proxyUrl());
+  const proxyNote = proxied ? " · via proxy" : " · datacenter IPs may be 403'd (set SCRAPER_PROXY)";
   const sources: SourceHealth[] = [
     { source: "demo", ready: true, note: "offline sample data" },
     {
       source: "craigslist",
       ready: true,
-      note: (process.env.CRAIGSLIST_ENRICH ?? "false") === "true" ? "RSS + page enrichment (photos)" : "RSS only — set CRAIGSLIST_ENRICH=true for photos",
+      note: ((process.env.CRAIGSLIST_ENRICH ?? "false") === "true" ? "RSS + photos" : "RSS only") + proxyNote,
     },
     {
       source: "facebook",
@@ -59,6 +62,7 @@ export async function health() {
     },
     identify: llmInfo().configured ? `ai-vision (${llmInfo().provider}/${llmInfo().model})` : "offline-heuristic",
     notifiers: notifierStatus(),
+    proxy: Boolean(proxyUrl()),
   };
 }
 

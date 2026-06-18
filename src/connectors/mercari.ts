@@ -51,6 +51,7 @@ export class MercariConnector implements SourceConnector {
         locale: fp.locale,
         timezoneId: fp.timezoneId,
         ignoreHTTPSErrors: opts.ignoreHTTPSErrors,
+        proxy: opts.proxy,
       });
       await ctx.addInitScript(STEALTH_INIT_SCRIPT);
       const page = await ctx.newPage();
