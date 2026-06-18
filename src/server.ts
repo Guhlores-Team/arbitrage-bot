@@ -68,7 +68,7 @@ const server = createServer(async (req, res) => {
         compBasis: compInfo().basis,
         notifiers: notifierStatus(),
         // is the 24/7 scheduler (watchlists + discovery sweeps) running in this process?
-        watchInServer: (process.env.WATCH_IN_SERVER ?? "false") === "true",
+        watchInServer: (process.env.WATCH_IN_SERVER ?? "true") === "true",
       });
     }
 
@@ -368,12 +368,13 @@ server.listen(PORT, HOST, () => {
   if (!llmInfo().configured) {
     console.log("  (no LLM key: identify/match run in offline heuristic mode)");
   }
-  // One-process deploy: also run scheduled watchlists here when asked, so a
-  // single `npm run dashboard` covers the UI + the scheduler on one VM.
-  if ((process.env.WATCH_IN_SERVER ?? "false") === "true") {
+  // One-process deploy: also run scheduled watchlists + discovery sweeps here so
+  // a single process covers the UI + the 24/7 hunter on one VM. On by default;
+  // set WATCH_IN_SERVER=false to serve the UI only (e.g. a second read-only node).
+  if ((process.env.WATCH_IN_SERVER ?? "true") === "true") {
     startWatch().catch((e) => console.error("watch loop failed to start:", e));
   } else {
-    console.log("  (set WATCH_IN_SERVER=true to run scheduled watchlists in this process)");
+    console.log("  (WATCH_IN_SERVER=false: scheduler off — UI only)");
   }
   console.log("");
 });
