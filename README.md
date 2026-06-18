@@ -220,7 +220,12 @@ live. Browse asks are a rougher comp than solds, but free and ungated.
 
 **Multiple comp markets:** `COMP_SOURCES=ebay,pricecharting` blends them so resale
 triangulates across markets. PriceCharting (games/consoles/cards) needs
-`PRICECHARTING_TOKEN` to go live, else returns mock comps.
+`PRICECHARTING_TOKEN`; Keepa (Amazon) needs `KEEPA_API_KEY`; both mock without.
+
+**Category routing:** `COMP_SOURCES=auto` values each item against eBay plus the
+best specialized market for its category — games/cards → PriceCharting, sneakers
+→ StockX — and only blends a specialized market when it has real data (a keyless
+market never pollutes live eBay comps).
 
 **Scanning everywhere:** pass `--source=all` (CLI) or pick "all sources" in the
 dashboard / watchlists / sweeps to hit Craigslist + Facebook + OfferUp + Mercari
