@@ -22,9 +22,8 @@ Type=simple
 User=alynx066
 WorkingDirectory=/home/alynx066/arbitrage-bot
 EnvironmentFile=/home/alynx066/arbitrage-bot/.env
-Environment=WATCH_IN_SERVER=true
-Environment=HOST=127.0.0.1
-Environment=PORT=3000
+# HOST/PORT come from .env (the `serve` script already sets WATCH_IN_SERVER).
+# Set HOST=0.0.0.0 in .env to reach the dashboard over Tailscale/LAN.
 ExecStart=/usr/bin/env npm run serve
 Restart=on-failure
 RestartSec=5
