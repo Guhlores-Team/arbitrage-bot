@@ -1,8 +1,13 @@
 import { Actor } from "apify";
-import { PlaywrightCrawler, log } from "crawlee";
+import { CheerioCrawler, log } from "crawlee";
 
 /**
  * eBay Scraper (Apify actor) — active listings.
+ *
+ * eBay search pages are server-rendered HTML, so we fetch over plain HTTP with
+ * browser-like headers (CheerioCrawler) behind a US residential proxy — cheap,
+ * fast, and usually sidesteps the headless-Chromium bot challenge.
+ *
  * Input:  { query, maxItems, sort, condition, maxPrice, proxyConfiguration }
  * Output: { id, title, price, currency, condition, url, image, source }
  */
@@ -26,73 +31,90 @@ if (condition === "new") params.set("LH_ItemCondition", "1000");
 if (condition === "used") params.set("LH_ItemCondition", "3000");
 const startUrl = `https://www.ebay.com/sch/i.html?${params.toString()}`;
 
-const crawler = new PlaywrightCrawler({
+const crawler = new CheerioCrawler({
   proxyConfiguration,
   maxRequestsPerCrawl: 1,
-  maxRequestRetries: 1,
-  navigationTimeoutSecs: 45,
-  requestHandlerTimeoutSecs: 90,
-  launchContext: { launchOptions: { args: ["--disable-blink-features=AutomationControlled"] } },
-  // Block images/media/fonts/CSS to cut residential-proxy bandwidth and runtime.
-  preNavigationHooks: [
-    async ({ page }) => {
-      await page.route("**/*", (route) => {
-        const t = route.request().resourceType();
-        return t === "image" || t === "media" || t === "font" || t === "stylesheet" ? route.abort() : route.continue();
-      });
-    },
-  ],
-  requestHandler: async ({ page }) => {
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(1500);
-    const raw = await extractItems(page);
-    const out = raw
+  maxRequestRetries: 2,
+  requestHandlerTimeoutSecs: 60,
+  requestHandler: async ({ $, body }) => {
+    const out = extractItems($)
       .map(parseItem)
       .filter((l) => l.title && l.price > 0 && !/^shop on ebay$/i.test(l.title))
       .filter((l) => !maxPrice || l.price <= maxPrice)
       .slice(0, maxItems);
-    if (!out.length) log.warning(`0 listings — page "${await page.title()}" at ${page.url()} (eBay markup/challenge?).`);
+    if (!out.length) {
+      log.warning(`0 listings — page title "${$("title").text().trim()}" (len=${(body || "").length}; challenge?).`);
+    }
     log.info(`Scraped ${out.length} listings for "${query}".`);
     await Actor.pushData(out);
   },
 });
 
-await crawler.run([startUrl]);
+await crawler.run([
+  {
+    url: startUrl,
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      Referer: "https://www.ebay.com/",
+    },
+  },
+]);
 await Actor.exit();
 
-// Key off /itm/ links rather than a CSS class (eBay rotates .s-item / .s-card),
-// climbing to the nearest price-bearing ancestor — the result card.
-async function extractItems(page) {
-  return page.$$eval("a[href*='/itm/']", (links) => {
-    const priceRe = /\$\s?[\d,]+(?:\.\d{1,2})?/;
-    const q = (el, sel) => { const n = el.querySelector(sel); return n ? (n.textContent ?? "").trim() : ""; };
-    const seen = new Set();
-    const out = [];
-    for (const link of links) {
-      const href = String(link.href).split("?")[0];
+// ---------- helpers ----------
+
+function extractItems($) {
+  const out = [];
+  const cards = $("li.s-item, .s-item");
+  if (cards.length) {
+    cards.each((_, el) => {
+      const card = $(el);
+      const link = card.find("a.s-item__link, a[href*='/itm/']").first();
+      const href = String(link.attr("href") || "").split("?")[0];
       const m = href.match(/\/itm\/(\d+)/);
-      const id = m ? m[1] : href;
-      if (seen.has(id)) continue;
-      let card = link;
-      for (let i = 0; i < 6 && card; i++) {
-        if (priceRe.test(card.textContent || "")) break;
-        card = card.parentElement;
-      }
-      card = card || link.parentElement || link;
-      const img = card.querySelector("img");
-      const priceM = (card.textContent || "").match(priceRe);
-      seen.add(id);
+      const img = card.find("img").first();
       out.push({
         id: m ? m[1] : "",
         url: href,
-        title: q(card, ".s-item__title") || (img && img.getAttribute("alt")) || (link.textContent ?? "").trim(),
-        price: priceM ? priceM[0] : "",
-        condition: q(card, ".s-item__subtitle, .SECONDARY_INFO"),
-        image: img ? img.getAttribute("src") || img.getAttribute("data-src") || undefined : undefined,
+        title: card.find(".s-item__title").first().text().trim(),
+        price: card.find(".s-item__price").first().text().trim(),
+        condition: card.find(".SECONDARY_INFO, .s-item__subtitle").first().text().trim(),
+        image: img.attr("src") || img.attr("data-src"),
       });
-    }
+    });
     return out;
+  }
+
+  const priceRe = /\$\s?[\d,]+(?:\.\d{1,2})?/;
+  const seen = new Set();
+  $("a[href*='/itm/']").each((_, a) => {
+    const link = $(a);
+    const href = String(link.attr("href") || "").split("?")[0];
+    const m = href.match(/\/itm\/(\d+)/);
+    const id = m ? m[1] : href;
+    if (seen.has(id)) return;
+    let card = link;
+    for (let i = 0; i < 6; i++) {
+      if (priceRe.test(card.text())) break;
+      const p = card.parent();
+      if (!p.length) break;
+      card = p;
+    }
+    const priceM = card.text().match(priceRe);
+    seen.add(id);
+    out.push({
+      id: m ? m[1] : "",
+      url: href,
+      title: link.text().trim() || card.find("img").first().attr("alt") || "",
+      price: priceM ? priceM[0] : "",
+      condition: card.find(".SECONDARY_INFO, .s-item__subtitle").first().text().trim(),
+      image: card.find("img").first().attr("src"),
+    });
   });
+  return out;
 }
 
 function parseItem(raw) {

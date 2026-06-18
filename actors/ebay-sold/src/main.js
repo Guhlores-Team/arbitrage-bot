@@ -1,12 +1,14 @@
 import { Actor } from "apify";
-import { PlaywrightCrawler, log } from "crawlee";
+import { CheerioCrawler, log } from "crawlee";
 
 /**
  * eBay Sold Listings Scraper (Apify actor).
  *
  * Pulls eBay's SOLD / completed search results — the real realized prices that
- * make a resale comp trustworthy. No eBay API approval (Marketplace Insights is
- * gated); just the public sold-listings search behind a residential proxy.
+ * make a resale comp trustworthy. eBay search pages are server-rendered HTML, so
+ * we fetch over plain HTTP with browser-like headers (CheerioCrawler) behind a
+ * US residential proxy. No browser to launch means it's cheap and fast, and a
+ * plain request often sidesteps the headless-Chromium bot challenge.
  *
  * Input:  { query, maxItems, condition, maxPrice, proxyConfiguration }
  * Output: { id, title, price, currency, condition, soldAt, url, image, market }
@@ -28,100 +30,106 @@ if (!query) throw new Error('Input "query" is required.');
 const proxyConfiguration = await Actor.createProxyConfiguration(proxyInput);
 
 // LH_Sold=1 + LH_Complete=1 = sold & completed; _sop=13 = ended recently; _ipg = page size.
-const params = new URLSearchParams({
-  _nkw: query,
-  LH_Sold: "1",
-  LH_Complete: "1",
-  _sop: "13",
-  _ipg: "60",
-});
+const params = new URLSearchParams({ _nkw: query, LH_Sold: "1", LH_Complete: "1", _sop: "13", _ipg: "60" });
 if (condition === "new") params.set("LH_ItemCondition", "1000");
 if (condition === "used") params.set("LH_ItemCondition", "3000");
 const startUrl = `https://www.ebay.com/sch/i.html?${params.toString()}`;
 
-const crawler = new PlaywrightCrawler({
+const crawler = new CheerioCrawler({
   proxyConfiguration,
   maxRequestsPerCrawl: 1,
-  maxRequestRetries: 1,
-  navigationTimeoutSecs: 45,
-  requestHandlerTimeoutSecs: 90,
-  launchContext: {
-    launchOptions: { args: ["--disable-blink-features=AutomationControlled"] },
-  },
-  // Block images/media/fonts/CSS — eBay results are server-rendered HTML, so the
-  // data is in the DOM regardless, and this slashes residential-proxy bandwidth
-  // (the main per-run cost) and runtime.
-  preNavigationHooks: [
-    async ({ page }) => {
-      await page.route("**/*", (route) => {
-        const t = route.request().resourceType();
-        return t === "image" || t === "media" || t === "font" || t === "stylesheet" ? route.abort() : route.continue();
-      });
-    },
-  ],
-  requestHandler: async ({ page }) => {
-    await page.waitForLoadState("domcontentloaded");
-    // Sold results render server-side; a short settle is enough.
-    await page.waitForTimeout(1500);
-
-    const raw = await extractItems(page);
-    const out = raw
+  maxRequestRetries: 2,
+  requestHandlerTimeoutSecs: 60,
+  requestHandler: async ({ $, body }) => {
+    const out = extractItems($)
       .map(parseItem)
       .filter((c) => c.title && c.price > 0 && !/^shop on ebay$/i.test(c.title))
       .filter((c) => !maxPrice || c.price <= maxPrice)
       .slice(0, maxItems);
 
-    if (!out.length) log.warning(`0 sold comps — page "${await page.title()}" at ${page.url()} (eBay markup/challenge?).`);
+    if (!out.length) {
+      log.warning(`0 sold comps — page title "${$("title").text().trim()}" (len=${(body || "").length}; challenge?).`);
+    }
     log.info(`Scraped ${out.length} sold comps for "${query}".`);
     await Actor.pushData(out);
   },
 });
 
-await crawler.run([startUrl]);
+// Browser-like headers so eBay serves the results HTML rather than a challenge.
+await crawler.run([
+  {
+    url: startUrl,
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      Referer: "https://www.ebay.com/",
+    },
+  },
+]);
 await Actor.exit();
 
 // ---------- helpers ----------
 
 /**
- * Pull raw fields per result, keyed off the item link rather than a CSS class
- * (eBay rotates .s-item / .s-card markup). For each /itm/ link we climb to the
- * nearest ancestor that actually contains a price — that's the result card —
- * then read title/price/condition/sold-date from it.
+ * Pull raw fields per sold card. Prefer eBay's .s-item markup; if that class
+ * isn't present (markup rotation), fall back to keying off /itm/ links and
+ * climbing to the nearest price-bearing ancestor.
  */
-async function extractItems(page) {
-  return page.$$eval("a[href*='/itm/']", (links) => {
-    const priceRe = /\$\s?[\d,]+(?:\.\d{1,2})?/;
-    const q = (el, sel) => { const n = el.querySelector(sel); return n ? (n.textContent ?? "").trim() : ""; };
-    const seen = new Set();
-    const out = [];
-    for (const link of links) {
-      const href = String(link.href).split("?")[0];
+function extractItems($) {
+  const out = [];
+  const cards = $("li.s-item, .s-item");
+  if (cards.length) {
+    cards.each((_, el) => {
+      const card = $(el);
+      const link = card.find("a.s-item__link, a[href*='/itm/']").first();
+      const href = String(link.attr("href") || "").split("?")[0];
       const m = href.match(/\/itm\/(\d+)/);
-      const id = m ? m[1] : href;
-      if (seen.has(id)) continue;
-      let card = link;
-      for (let i = 0; i < 6 && card; i++) {
-        if (priceRe.test(card.textContent || "")) break;
-        card = card.parentElement;
-      }
-      card = card || link.parentElement || link;
-      const img = card.querySelector("img");
-      const cardText = card.textContent || "";
-      const priceM = cardText.match(priceRe);
-      const soldM = cardText.match(/Sold\s+[A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4}/);
-      seen.add(id);
+      const img = card.find("img").first();
       out.push({
         id: m ? m[1] : "",
         url: href,
-        title: q(card, ".s-item__title") || (img && img.getAttribute("alt")) || (link.textContent ?? "").trim(),
-        price: priceM ? priceM[0] : "",
-        condition: q(card, ".SECONDARY_INFO, .s-item__subtitle"),
-        sold: soldM ? soldM[0] : "",
-        image: img ? img.getAttribute("src") || img.getAttribute("data-src") || undefined : undefined,
+        title: card.find(".s-item__title").first().text().trim(),
+        price: card.find(".s-item__price").first().text().trim(),
+        condition: card.find(".SECONDARY_INFO, .s-item__subtitle").first().text().trim(),
+        sold: card.find(".s-item__caption--signal, .s-item__caption, .POSITIVE").first().text().trim(),
+        image: img.attr("src") || img.attr("data-src"),
       });
-    }
+    });
     return out;
+  }
+
+  const priceRe = /\$\s?[\d,]+(?:\.\d{1,2})?/;
+  const seen = new Set();
+  $("a[href*='/itm/']").each((_, a) => {
+    const link = $(a);
+    const href = String(link.attr("href") || "").split("?")[0];
+    const m = href.match(/\/itm\/(\d+)/);
+    const id = m ? m[1] : href;
+    if (seen.has(id)) return;
+    let card = link;
+    for (let i = 0; i < 6; i++) {
+      if (priceRe.test(card.text())) break;
+      const p = card.parent();
+      if (!p.length) break;
+      card = p;
+    }
+    const cardText = card.text();
+    const priceM = cardText.match(priceRe);
+    const soldM = cardText.match(/Sold\s+[A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4}/);
+    seen.add(id);
+    out.push({
+      id: m ? m[1] : "",
+      url: href,
+      title: link.text().trim() || card.find("img").first().attr("alt") || "",
+      price: priceM ? priceM[0] : "",
+      condition: card.find(".SECONDARY_INFO, .s-item__subtitle").first().text().trim(),
+      sold: soldM ? soldM[0] : "",
+      image: card.find("img").first().attr("src"),
+    });
   });
+  return out;
 }
 
 /** Normalize a raw card into the comp shape the engine consumes. */
