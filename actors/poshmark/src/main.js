@@ -31,6 +31,16 @@ const crawler = new PlaywrightCrawler({
   navigationTimeoutSecs: 60,
   requestHandlerTimeoutSecs: 240,
   launchContext: { launchOptions: { args: ["--disable-blink-features=AutomationControlled"] } },
+  // Block images/media/fonts/CSS — listings render from JS/DOM regardless, and
+  // this cuts residential-proxy bandwidth (the main per-run cost) and runtime.
+  preNavigationHooks: [
+    async ({ page }) => {
+      await page.route("**/*", (route) => {
+        const t = route.request().resourceType();
+        return t === "image" || t === "media" || t === "font" || t === "stylesheet" ? route.abort() : route.continue();
+      });
+    },
+  ],
   requestHandler: async ({ page }) => {
     await page.waitForTimeout(2500);
     for (let i = 0; i < maxScrolls && seen.size < maxItems; i++) {
@@ -49,14 +59,25 @@ await Actor.exit();
 
 async function extractCards(page) {
   return page.$$eval('a[href*="/listing/"]', (anchors) => {
+    const priceRe = /\$\s?[\d,]+/;
+    const seen = new Set();
     const out = [];
     for (const a of anchors) {
       const href = String(a.href).split("?")[0];
       const m = href.match(/\/listing\/[\w-]*-([a-f0-9]+)$/i) || href.match(/\/listing\/([\w-]+)$/i);
-      if (!m) continue;
-      const tile = a.closest("[data-et-name], .card, .tile") || a;
+      if (!m || seen.has(m[1])) continue;
+      // Climb to the nearest ancestor that actually holds a price — the card.
+      // (Poshmark's price sits outside the anchor, so scanning the anchor alone
+      // yielded $0.)
+      let tile = a;
+      for (let i = 0; i < 5 && tile; i++) {
+        if (priceRe.test(tile.textContent || "")) break;
+        tile = tile.parentElement;
+      }
+      tile = tile || a;
       const texts = Array.from(tile.querySelectorAll("span,div,p")).map((s) => (s.textContent ?? "").trim()).filter(Boolean);
-      const img = tile.querySelector("img");
+      const img = tile.querySelector("img") || a.querySelector("img");
+      seen.add(m[1]);
       out.push({
         id: m[1],
         url: href,
