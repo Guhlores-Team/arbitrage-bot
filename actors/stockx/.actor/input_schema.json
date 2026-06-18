@@ -1,0 +1,11 @@
+{
+  "title": "StockX Scraper",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "query": { "title": "Search query", "type": "string", "description": "Product to search StockX for.", "editor": "textfield", "prefill": "jordan 1 chicago" },
+    "maxItems": { "title": "Max products", "type": "integer", "description": "Stop after this many products.", "default": 20, "minimum": 1, "maximum": 120 },
+    "proxyConfiguration": { "title": "Proxy", "type": "object", "description": "Residential proxy strongly recommended — StockX is bot-protected.", "editor": "proxy", "default": { "useApifyProxy": true, "apifyProxyGroups": ["RESIDENTIAL"] } }
+  },
+  "required": ["query"]
+}

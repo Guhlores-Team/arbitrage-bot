@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "stockx-scraper",
+  "title": "StockX Scraper",
+  "description": "Scrape StockX search results — product name, market price, image and URL — for sneaker & streetwear resale comps. Behind a residential proxy.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

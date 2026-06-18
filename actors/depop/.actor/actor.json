@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "depop-scraper",
+  "title": "Depop Scraper",
+  "description": "Scrape Depop search results — title, price, image and listing URL — for fashion/vintage buy-side sourcing. Behind a residential proxy.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

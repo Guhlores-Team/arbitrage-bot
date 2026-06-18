@@ -1,11 +1,27 @@
 import { test, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { ApifyCompConnector } from "../src/connectors/apify-comp.js";
+import { ApifyCompConnector, parseApifyComps } from "../src/connectors/apify-comp.js";
 
 const realFetch = globalThis.fetch;
 const env = { ...process.env };
 beforeEach(() => {
   for (const k of Object.keys(process.env)) if (k.startsWith("APIFY_")) delete process.env[k];
+});
+
+test("parseApifyComps reads per-market configs and drops entries missing market/actor", () => {
+  process.env.APIFY_COMPS = JSON.stringify([
+    { market: "stockx", actor: "me/stockx-scraper" },
+    { actor: "x/y" }, // no market -> dropped
+    { market: "poshmark" }, // no actor/task -> dropped
+  ]);
+  const cfgs = parseApifyComps();
+  assert.equal(cfgs.length, 1);
+  assert.equal(cfgs[0].market, "stockx");
+});
+
+test("parseApifyComps returns [] on malformed env", () => {
+  process.env.APIFY_COMPS = "{nope";
+  assert.deepEqual(parseApifyComps(), []);
 });
 afterEach(() => {
   globalThis.fetch = realFetch;

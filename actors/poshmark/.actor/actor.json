@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "poshmark-scraper",
+  "title": "Poshmark Scraper",
+  "description": "Scrape Poshmark search results — available listings for buy-side sourcing, or sold listings for resale comps. Title, price, size, image and URL.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

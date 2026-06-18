@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "hibid-auction-scraper",
+  "title": "HiBid Auction Scraper",
+  "description": "Scrape HiBid auction lots — title, current bid, image and URL — for estate, liquidation and storage-unit sourcing. Behind a residential proxy.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

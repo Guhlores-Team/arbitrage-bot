@@ -3,7 +3,7 @@ import { PriceChartingConnector } from "./connectors/pricecharting.js";
 import { KeepaConnector } from "./connectors/keepa.js";
 import { StockXConnector } from "./connectors/stockx.js";
 import { SerpApiShoppingConnector } from "./connectors/serpapi.js";
-import { ApifyCompConnector } from "./connectors/apify-comp.js";
+import { ApifyCompConnector, parseApifyComps } from "./connectors/apify-comp.js";
 import { MultiCompConnector } from "./connectors/multicomp.js";
 import { RoutingCompConnector } from "./connectors/routing.js";
 import { effectiveCompSources } from "./settings.js";
@@ -12,7 +12,14 @@ import type { CompConnector } from "./connectors/connector.js";
 /** Comp markets the engine can value against. */
 export const COMP_MARKETS = ["ebay", "ebay-sold", "pricecharting", "keepa", "stockx", "google"] as const;
 
+/** Your own Apify comp actors, keyed by the market they cover (from APIFY_COMPS). */
+const apifyCompsByMarket = new Map(parseApifyComps().map((c) => [c.market, c]));
+
 function makeComp(name: string): CompConnector | null {
+  // A market wired to your own Apify actor (e.g. stockx) returns real data.
+  const apifyCfg = apifyCompsByMarket.get(name);
+  if (apifyCfg) return new ApifyCompConnector(apifyCfg);
+
   switch (name) {
     case "ebay":
       return new EbayCompConnector();

@@ -1,0 +1,9 @@
+{
+  "name": "stockx-scraper",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Scrape StockX search results — product, market price, image and URL — for sneaker/streetwear resale comps.",
+  "engines": { "node": ">=18" },
+  "dependencies": { "apify": "^3.2.6", "crawlee": "^3.11.5" },
+  "scripts": { "start": "node src/main.js" }
+}

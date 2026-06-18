@@ -13,6 +13,33 @@ Apify Store to monetize** (rental or pay-per-result).
 | `offerup/` | ✅ ready to deploy | BUY source |
 | `mercari/` | ✅ ready to deploy | BUY source |
 | `craigslist/` | ✅ ready to deploy | BUY source (residential proxy beats IP blocks) |
+| `ebay/` | ✅ ready to deploy | BUY source (active listings) |
+| `stockx/` | ✅ ready to deploy | COMP source (sneakers — turns StockX real) |
+| `poshmark/` | ✅ ready to deploy | BUY + COMP (fashion; sold=comps) |
+| `depop/` | ✅ ready to deploy | BUY source (fashion/vintage) |
+| `nextdoor/` | ✅ ready to deploy | BUY source (hyperlocal; needs cookies) |
+| `auctions-hibid/` | ✅ ready to deploy | BUY source (estate/liquidation lots) |
+
+> The fashion/sneaker/local/auction actors use **best-effort selectors** — they
+> follow each site's current markup and may need a tweak in `extractCards()` after
+> the first real run (this is normal for every scraper here). The architecture
+> (parsing, failover, comp bridge) is the durable part.
+
+## Wire a comp actor as a real market (e.g. StockX)
+
+Turn a mock comp market into real data with your own actor — set `APIFY_COMPS`
+(JSON array, one entry per market). A market that matches a built-in (like
+`stockx`) then returns real data instead of mock:
+
+```bash
+APIFY_TOKEN=apify_api_...
+APIFY_COMPS=[{"market":"stockx","actor":"<you>~stockx-scraper"},
+             {"market":"poshmark","actor":"<you>~poshmark-scraper","input":{"availability":"sold"}}]
+```
+
+Then select it in Settings or `COMP_SOURCES` (e.g. `ebay-sold,stockx`). The
+single eBay-sold slot (`APIFY_COMP_ACTOR`) still works on its own; `APIFY_COMPS`
+is for wiring several at once.
 
 ## Redundancy: actor + in-process scraper, "won't fail"
 

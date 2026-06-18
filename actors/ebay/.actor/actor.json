@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "ebay-scraper",
+  "title": "eBay Scraper",
+  "description": "Scrape eBay active listings — title, price, condition, image and URL. Buy-side sourcing and price research, no eBay API approval needed.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

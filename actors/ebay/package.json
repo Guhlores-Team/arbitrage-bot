@@ -1,0 +1,9 @@
+{
+  "name": "ebay-scraper",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Scrape eBay active listings — title, price, condition, image and URL — for buy-side sourcing and price research.",
+  "engines": { "node": ">=18" },
+  "dependencies": { "apify": "^3.2.6", "crawlee": "^3.11.5" },
+  "scripts": { "start": "node src/main.js" }
+}

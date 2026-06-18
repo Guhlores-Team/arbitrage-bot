@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "nextdoor-scraper",
+  "title": "Nextdoor For Sale & Free Scraper",
+  "description": "Scrape Nextdoor 'For Sale & Free' listings — title, price, image and URL — using your login cookies behind a residential proxy.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

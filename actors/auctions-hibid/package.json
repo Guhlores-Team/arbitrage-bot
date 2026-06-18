@@ -1,0 +1,9 @@
+{
+  "name": "hibid-auction-scraper",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Scrape HiBid auction lots — title, current bid, image and URL — for estate/liquidation sourcing.",
+  "engines": { "node": ">=18" },
+  "dependencies": { "apify": "^3.2.6", "crawlee": "^3.11.5" },
+  "scripts": { "start": "node src/main.js" }
+}

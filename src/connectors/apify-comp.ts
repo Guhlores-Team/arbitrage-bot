@@ -142,3 +142,28 @@ function hash(s: string): number {
   }
   return Math.abs(h);
 }
+
+/**
+ * Parse APIFY_COMPS env into per-market comp configs (like APIFY_SOURCES, but for
+ * the sell side). Lets you wire several of your own comp actors at once, e.g.:
+ *
+ *   APIFY_COMPS=[{"market":"stockx","actor":"you~stockx-scraper"},
+ *                {"market":"poshmark","actor":"you~poshmark-scraper","input":{"sold":true}}]
+ *
+ * A config whose market matches a built-in comp (e.g. "stockx") makes that market
+ * return REAL data from your actor instead of mock. Malformed entries are ignored.
+ */
+export function parseApifyComps(): (ApifyCompConfig & { market: string })[] {
+  const raw = process.env.APIFY_COMPS;
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(
+      (c): c is ApifyCompConfig & { market: string } =>
+        c && typeof c.market === "string" && (typeof c.actor === "string" || typeof c.taskId === "string"),
+    );
+  } catch {
+    return [];
+  }
+}

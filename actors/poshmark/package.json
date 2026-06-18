@@ -1,0 +1,9 @@
+{
+  "name": "poshmark-scraper",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Scrape Poshmark search — available listings (buy) or sold listings (comps): title, price, size, image and URL.",
+  "engines": { "node": ">=18" },
+  "dependencies": { "apify": "^3.2.6", "crawlee": "^3.11.5" },
+  "scripts": { "start": "node src/main.js" }
+}
