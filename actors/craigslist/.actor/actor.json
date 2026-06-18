@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "craigslist-scraper",
+  "title": "Craigslist Scraper",
+  "description": "Scrape Craigslist search results via its RSS feed behind a residential proxy — title, price, description and listing URL. Residential IPs bypass the datacenter-IP blocks that break server-side scraping.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

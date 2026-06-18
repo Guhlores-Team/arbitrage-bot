@@ -30,6 +30,14 @@ export interface ApifySourceConfig {
   queryField?: string;
   input?: Record<string, unknown>;
   map?: Partial<Record<"id" | "title" | "price" | "url" | "image" | "location", string>>;
+  /**
+   * When this Apify source shares a name with a built-in scraper, they're
+   * composed into a failover. By default the free in-process scraper runs first
+   * and Apify is the fallback. Set primary=true to flip it (Apify first) — useful
+   * for sources where in-process is unreliable on your host (e.g. an IP-blocked
+   * Craigslist or a timing-out OfferUp on a datacenter VM).
+   */
+  primary?: boolean;
 }
 
 export class ApifyConnector implements SourceConnector {
@@ -106,7 +114,10 @@ export function parseApifySources(): ApifySourceConfig[] {
   try {
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return [];
-    return arr.filter((c) => c && typeof c.name === "string" && (typeof c.actor === "string" || typeof c.taskId === "string"));
+    return arr.filter(
+      (c): c is ApifySourceConfig =>
+        c && typeof c.name === "string" && (typeof c.actor === "string" || typeof c.taskId === "string"),
+    );
   } catch {
     return [];
   }

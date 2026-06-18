@@ -27,10 +27,12 @@ export class MultiSourceConnector implements SourceConnector {
       try {
         const listings = await withTimeout(child.search(q), perSourceMs, child.source);
         for (const listing of listings) {
-          if (!seen.has(listing.id)) {
-            seen.add(listing.id);
-            out.push(listing);
-          }
+          // De-dupe on id AND normalized URL so the same item arriving via two
+          // paths (e.g. in-process + Apify) collapses to one card.
+          const keys = dedupeKeys(listing);
+          if (keys.some((k) => seen.has(k))) continue;
+          for (const k of keys) seen.add(k);
+          out.push(listing);
         }
       } catch (e: any) {
         // One source failing/timing out (blocked, login, network) must not sink the scan.
@@ -39,6 +41,36 @@ export class MultiSourceConnector implements SourceConnector {
     }
     return out;
   }
+}
+
+/** Identity keys for de-duping a listing: its id plus a normalized URL. */
+function dedupeKeys(l: SourceListing): string[] {
+  const keys = [`id:${l.id}`];
+  const url = normalizeUrl(l.url);
+  if (url) keys.push(`url:${url}`);
+  return keys;
+}
+
+/** Strip query/hash/trailing slash so the same item URL matches across sources.
+ *  Returns undefined for non-URL-shaped values (e.g. placeholders) so only real
+ *  links cross-collapse — ids still de-dupe everything else. */
+function normalizeUrl(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  let host = "";
+  let path = "/";
+  try {
+    const u = new URL(raw);
+    host = u.host;
+    path = u.pathname;
+  } catch {
+    const bare = raw.replace(/^https?:\/\//i, "");
+    if (!/^[\w.-]+\.[a-z]{2,}/i.test(bare)) return undefined; // needs a domain to count as a URL
+    const [h, ...rest] = bare.split(/[?#]/)[0].split("/");
+    host = h;
+    path = "/" + rest.join("/");
+  }
+  if (!host) return undefined;
+  return `${host}${path}`.replace(/\/+$/, "").toLowerCase();
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {

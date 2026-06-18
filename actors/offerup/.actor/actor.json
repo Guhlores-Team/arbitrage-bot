@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "offerup-scraper",
+  "title": "OfferUp Scraper",
+  "description": "Scrape OfferUp search results — title, price, location, image and listing URL — behind a residential proxy. No login required.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

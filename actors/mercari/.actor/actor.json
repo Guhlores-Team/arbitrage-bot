@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "mercari-scraper",
+  "title": "Mercari Scraper",
+  "description": "Scrape Mercari search results — title, price, image and listing URL — behind a residential proxy. No login required.",
+  "version": "0.1",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

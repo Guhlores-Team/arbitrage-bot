@@ -1,0 +1,45 @@
+{
+  "title": "OfferUp Scraper",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "query": {
+      "title": "Search query",
+      "type": "string",
+      "description": "What to search OfferUp for.",
+      "editor": "textfield",
+      "prefill": "nintendo switch"
+    },
+    "maxItems": {
+      "title": "Max listings",
+      "type": "integer",
+      "description": "Stop after this many listings.",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 300
+    },
+    "maxScrolls": {
+      "title": "Max scrolls",
+      "type": "integer",
+      "description": "Hard cap on scroll cycles (controls cost vs. depth).",
+      "default": 12,
+      "minimum": 1,
+      "maximum": 60
+    },
+    "maxPrice": {
+      "title": "Max price",
+      "type": "integer",
+      "description": "Drop listings above this price (optional).",
+      "nullable": true,
+      "minimum": 0
+    },
+    "proxyConfiguration": {
+      "title": "Proxy",
+      "type": "object",
+      "description": "Use Apify residential proxies (recommended) or your own.",
+      "editor": "proxy",
+      "default": { "useApifyProxy": true, "apifyProxyGroups": ["RESIDENTIAL"] }
+    }
+  },
+  "required": ["query"]
+}
