@@ -5,6 +5,7 @@ import { StockXConnector } from "./connectors/stockx.js";
 import { SerpApiShoppingConnector } from "./connectors/serpapi.js";
 import { MultiCompConnector } from "./connectors/multicomp.js";
 import { RoutingCompConnector } from "./connectors/routing.js";
+import { effectiveCompSources } from "./settings.js";
 import type { CompConnector } from "./connectors/connector.js";
 
 /** Comp markets the engine can value against. */
@@ -37,7 +38,7 @@ function makeComp(name: string): CompConnector | null {
  *   - single name       → just that market
  */
 export function buildComper(): CompConnector {
-  const names = (process.env.COMP_SOURCES ?? "ebay")
+  const names = effectiveCompSources()
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);

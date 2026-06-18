@@ -10,7 +10,8 @@ import { store } from "./store.js";
 import { notify, notifierStatus, notifyOpportunities } from "./notify.js";
 import { health } from "./health.js";
 import { llmInfo } from "./llm.js";
-import { compInfo } from "./comps.js";
+import { compInfo, COMP_MARKETS } from "./comps.js";
+import { initSettings, getSettings, saveSettings } from "./settings.js";
 import { startWatch } from "./watch.js";
 import { STARTER_KEYWORDS } from "./sweep.js";
 import { generateListing } from "./listing.js";
@@ -57,7 +58,8 @@ const server = createServer(async (req, res) => {
       const llm = llmInfo();
       return json(res, 200, {
         sources: SOURCES,
-        thresholds: THRESHOLDS,
+        thresholds: getSettings().thresholds ?? THRESHOLDS,
+        defaultSource: getSettings().defaultSource ?? "all",
         hasAnthropicKey: llm.configured, // back-compat: dashboard reads this as "identify on"
         llmProvider: llm.provider,
         llmModel: llm.model,
@@ -70,6 +72,25 @@ const server = createServer(async (req, res) => {
 
     if (method === "GET" && path === "/api/health") {
       return json(res, 200, await health());
+    }
+
+    if (path === "/api/settings") {
+      if (method === "GET") return json(res, 200, { settings: getSettings(), compMarkets: COMP_MARKETS, sources: SOURCES });
+      if (method === "PUT" || method === "POST") {
+        const body = await readBody(req);
+        const patch: any = {};
+        if (typeof body?.compSources === "string") patch.compSources = body.compSources;
+        if (typeof body?.defaultSource === "string") patch.defaultSource = body.defaultSource;
+        if (body?.thresholds) {
+          patch.thresholds = {
+            minMarginPct: Number(body.thresholds.minMarginPct ?? THRESHOLDS.minMarginPct),
+            minAbsoluteProfit: Number(body.thresholds.minAbsoluteProfit ?? THRESHOLDS.minAbsoluteProfit),
+            minMatchConfidence: Number(body.thresholds.minMatchConfidence ?? THRESHOLDS.minMatchConfidence),
+          };
+        }
+        if (body?.watchIntervalMin != null) patch.watchIntervalMin = Math.max(1, Number(body.watchIntervalMin));
+        return json(res, 200, { settings: await saveSettings(patch) });
+      }
     }
 
     if (method === "POST" && path === "/api/notify/test") {
@@ -325,6 +346,9 @@ function json(res: any, status: number, payload: unknown) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
 }
+
+// Load persisted settings before serving (buildComper reads them synchronously).
+await initSettings();
 
 server.on("error", (err: any) => {
   if (err?.code === "EADDRINUSE") {

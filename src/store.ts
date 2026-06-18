@@ -49,16 +49,24 @@ export interface Sweep {
   totalFound?: number;
 }
 
+export interface Settings {
+  compSources?: string; // e.g. "ebay,google" or "auto"
+  thresholds?: { minMarginPct: number; minAbsoluteProfit: number; minMatchConfidence: number };
+  defaultSource?: string;
+  watchIntervalMin?: number;
+}
+
 interface StoreData {
   opportunities: OpportunityView[];
   watchlists: Watchlist[];
   sweeps: Sweep[];
+  settings: Settings;
 }
 
 const MAX_OPPORTUNITIES = 1000;
 
 export class JsonStore {
-  private data: StoreData = { opportunities: [], watchlists: [], sweeps: [] };
+  private data: StoreData = { opportunities: [], watchlists: [], sweeps: [], settings: {} };
   private loaded = false;
 
   constructor(private file = process.env.STORE_FILE ?? join("data", "store.json")) {}
@@ -72,9 +80,10 @@ export class JsonStore {
         opportunities: Array.isArray(parsed.opportunities) ? parsed.opportunities : [],
         watchlists: Array.isArray(parsed.watchlists) ? parsed.watchlists : [],
         sweeps: Array.isArray(parsed.sweeps) ? parsed.sweeps : [],
+        settings: parsed.settings && typeof parsed.settings === "object" ? parsed.settings : {},
       };
     } catch {
-      this.data = { opportunities: [], watchlists: [], sweeps: [] }; // fresh store
+      this.data = { opportunities: [], watchlists: [], sweeps: [], settings: {} }; // fresh store
     }
     this.loaded = true;
   }
@@ -178,6 +187,20 @@ export class JsonStore {
     await this.load();
     this.data.opportunities = [];
     await this.flush();
+  }
+
+  // --- settings (editable runtime config) ---
+
+  async getSettings(): Promise<Settings> {
+    await this.load();
+    return { ...this.data.settings };
+  }
+
+  async setSettings(patch: Partial<Settings>): Promise<Settings> {
+    await this.load();
+    this.data.settings = { ...this.data.settings, ...patch };
+    await this.flush();
+    return { ...this.data.settings };
   }
 
   // --- watchlists (scheduled scans) ---

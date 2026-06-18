@@ -293,6 +293,10 @@
 
       <!-- SETTINGS -->
       <section class="view" id="view-settings">
+        <div class="panel" style="margin-bottom:14px">
+          <h3>Configure</h3>
+          <div id="settingsConfig"><div class="muted">loading…</div></div>
+        </div>
         <div class="cols">
           <div class="panel"><h3>Source readiness</h3><div id="settingsReadiness"><div class="muted">checking…</div></div></div>
           <div class="panel"><h3>Alerts</h3><div id="settingsAlerts"></div><button class="ghost" id="testAlert" style="margin-top:14px">Send test alert</button></div>
@@ -343,8 +347,9 @@ async function loadConfig() {
   const liveCount = config.sources.filter((s) => s !== "demo").length;
   const opts = `<option value="all">all sources (${liveCount})</option>` + config.sources.map((s) => `<option value="${s}">${s}</option>`).join("");
   $("source").innerHTML = opts; $("wlSource").innerHTML = opts; $("swSource").innerHTML = opts;
-  // default to real listings ("all"), not the demo sample
-  $("source").value = "all"; $("wlSource").value = "all"; $("swSource").value = "all";
+  // default to the saved default source (or real listings via "all"), not demo
+  const def = config.defaultSource || "all";
+  $("source").value = def; $("wlSource").value = def; $("swSource").value = def;
   $("minMargin").value = config.thresholds.minMarginPct;
   $("minProfit").value = config.thresholds.minAbsoluteProfit;
   $("minConf").value = config.thresholds.minMatchConfidence;
@@ -609,7 +614,50 @@ async function renderSettings() {
     ).join("") +
       `<div class="ready">${d(h.comps.live)}<div class="meta"><b>eBay comps</b><div class="note">${esc(h.comps.note)}</div></div></div>`;
   } catch { $("settingsReadiness").innerHTML = `<div class="muted err">health check failed</div>`; }
+  renderSettingsConfig();
 }
+
+async function renderSettingsConfig() {
+  let s;
+  try { s = await (await fetch("/api/settings")).json(); }
+  catch { $("settingsConfig").innerHTML = `<div class="muted err">could not load settings</div>`; return; }
+  const set = s.settings || {};
+  const active = (set.compSources || config.compSource || "ebay").split(",").map((x) => x.trim());
+  const isAuto = active.includes("auto");
+  const markets = (s.compMarkets || ["ebay"]).map((m) =>
+    `<label class="checkbox" style="margin-right:14px"><input type="checkbox" class="cm" value="${m}" ${active.includes(m) && !isAuto ? "checked" : ""} ${isAuto ? "disabled" : ""}/> ${m}</label>`).join("");
+  const th = set.thresholds || config.thresholds || {};
+  const srcOpts = ["all", ...config.sources].map((x) => `<option value="${x}" ${ (set.defaultSource||"all")===x ? "selected":""}>${x === "all" ? "all sources" : x}</option>`).join("");
+  $("settingsConfig").innerHTML = `
+    <div class="kv"><span>Comp markets to value against</span></div>
+    <label class="checkbox" style="margin:6px 0 8px"><input type="checkbox" id="cmAuto" ${isAuto ? "checked" : ""}/> auto (route by category: games→PriceCharting, sneakers→StockX, else eBay)</label>
+    <div id="cmList" style="margin-bottom:14px; ${isAuto ? "opacity:.45" : ""}">${markets}</div>
+    <div class="sliders" style="grid-template-columns:repeat(3,1fr)">
+      <div><label>Min margin %</label><input type="number" id="setMargin" step="0.05" min="0" max="1" value="${th.minMarginPct ?? 0.25}"/></div>
+      <div><label>Min net profit $</label><input type="number" id="setProfit" step="5" min="0" value="${th.minAbsoluteProfit ?? 20}"/></div>
+      <div><label>Min match confidence</label><input type="number" id="setConf" step="0.05" min="0" max="1" value="${th.minMatchConfidence ?? 0.8}"/></div>
+    </div>
+    <div style="margin-top:12px"><label>Default source</label><select id="setSource" style="max-width:220px">${srcOpts}</select></div>
+    <button class="go" id="saveSettings" style="margin-top:14px">Save settings</button>
+    <span class="muted" style="margin-left:12px">eBay/Keepa/etc. comps still need their API keys in <code>.env</code> to return real data.</span>`;
+  $("cmAuto").addEventListener("change", () => renderSettingsConfig());
+  $("saveSettings").addEventListener("click", saveSettingsFromUi);
+}
+
+async function saveSettingsFromUi() {
+  const auto = $("cmAuto").checked;
+  const picked = auto ? "auto" : [...document.querySelectorAll("#cmList .cm:checked")].map((c) => c.value).join(",") || "ebay";
+  const body = {
+    compSources: picked,
+    defaultSource: $("setSource").value,
+    thresholds: { minMarginPct: +$("setMargin").value, minAbsoluteProfit: +$("setProfit").value, minMatchConfidence: +$("setConf").value },
+  };
+  const r = await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) return toast("save failed");
+  toast("Settings saved");
+  await loadConfig(); // refresh sliders/source/mode banner with new defaults
+}
+
 $("testAlert").addEventListener("click", async () => {
   const r = await (await fetch("/api/notify/test", { method: "POST" })).json();
   toast(r.sent ? `Test alert sent to ${r.sent} channel(s)` : "No alert channels configured");
