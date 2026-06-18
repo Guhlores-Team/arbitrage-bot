@@ -2,7 +2,7 @@ import "./env.js";
 import { store, type Watchlist, type Sweep } from "./store.js";
 import { runScan } from "./scan.js";
 import { notifyOpportunities, notifierStatus } from "./notify.js";
-import { pickSweepBatch } from "./sweep.js";
+import { pickSweepBatch, STARTER_KEYWORDS } from "./sweep.js";
 
 /**
  * Watch runner: periodically runs each enabled watchlist, saves passing
@@ -76,6 +76,7 @@ async function runSweep(sw: Sweep): Promise<void> {
 export async function startWatch(): Promise<void> {
   if (started) return;
   started = true;
+  await seedDefaultSweep();
   const wls = await store.listWatchlists();
   const sweeps = await store.listSweeps();
   const n = notifierStatus();
@@ -86,6 +87,29 @@ export async function startWatch(): Promise<void> {
   );
   await tick();
   setInterval(tick, TICK_MS);
+}
+
+/**
+ * Turnkey discovery: the first time the scheduler ever runs, drop in an enabled
+ * "Auto-discovery" sweep across all sources using the starter category pack — so
+ * the engine starts hunting underpriced inventory with zero setup. Gated by a
+ * one-time settings flag, so deleting the sweep in the UI makes it stay gone.
+ */
+async function seedDefaultSweep(): Promise<void> {
+  const settings = await store.getSettings();
+  if (settings.seededDiscovery) return;
+  const existing = await store.listSweeps();
+  if (existing.length === 0) {
+    await store.addSweep({
+      label: "Auto-discovery",
+      keywords: STARTER_KEYWORDS,
+      source: "all",
+      intervalMin: 30,
+      perTick: 3,
+    });
+    console.log(`  Seeded default Auto-discovery sweep (${STARTER_KEYWORDS.length} categories, all sources).`);
+  }
+  await store.setSettings({ seededDiscovery: true });
 }
 
 async function runOne(wl: Watchlist): Promise<void> {

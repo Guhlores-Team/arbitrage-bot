@@ -67,6 +67,8 @@ const server = createServer(async (req, res) => {
         compSource: compInfo().markets,
         compBasis: compInfo().basis,
         notifiers: notifierStatus(),
+        // is the 24/7 scheduler (watchlists + discovery sweeps) running in this process?
+        watchInServer: (process.env.WATCH_IN_SERVER ?? "false") === "true",
       });
     }
 

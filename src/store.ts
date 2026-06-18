@@ -54,6 +54,8 @@ export interface Settings {
   thresholds?: { minMarginPct: number; minAbsoluteProfit: number; minMatchConfidence: number };
   defaultSource?: string;
   watchIntervalMin?: number;
+  /** set once we've auto-created the starter discovery sweep, so we never re-add it */
+  seededDiscovery?: boolean;
 }
 
 interface StoreData {

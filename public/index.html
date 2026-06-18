@@ -149,6 +149,15 @@
   .ready .meta { flex: 1; } .ready .meta b { font-size: 14px; } .ready .meta .note { color: var(--ink-3); font-size: 12px; }
   code { background: var(--surface-2); padding: 1px 6px; border-radius: 5px; font-size: 12px; font-family: var(--mono); color: var(--ink-2); }
 
+  /* ---- discover hero ---- */
+  .hero { background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--line-2); border-radius: var(--r-lg); padding: 20px; }
+  .hero .htitle { font-size: 16px; font-weight: 650; letter-spacing: -.01em; display: flex; align-items: center; gap: 9px; }
+  .hero .hbody { color: var(--ink-2); font-size: 13.5px; margin: 8px 0 16px; max-width: 640px; }
+  .hero .hrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .hero .big { height: 46px; padding: 0 22px; font-size: 14.5px; }
+  .runstate { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
   .state { text-align: center; color: var(--ink-3); padding: 64px 0; }
   .spinner { width: 24px; height: 24px; border: 2.5px solid var(--line-2); border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 14px; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -175,6 +184,9 @@
     .acts { flex-wrap: wrap; } .acts button { flex: 1 1 40%; }
     .tab { padding: 9px 12px; }
     .stats { grid-template-columns: repeat(2, 1fr); }
+    .hero { padding: 16px; } .hero .big { width: 100%; }
+    .panel { padding: 14px; }
+    table.wl { font-size: 13px; min-width: 540px; } /* let it scroll inside .table-wrap rather than crush columns */
   }
 </style>
 </head>
@@ -268,7 +280,9 @@
 
       <!-- DISCOVER -->
       <section class="view" id="view-discover">
-        <div class="panel">
+        <div id="discoverHero"></div>
+        <details class="tuning" id="swAdvanced" style="margin-bottom:14px"><summary>Build a custom sweep</summary>
+        <div class="panel" style="margin-top:12px">
           <form class="search" id="swForm" style="grid-template-columns: 1.6fr 110px 150px auto;">
             <div><label for="swLabel">Sweep name</label><input id="swLabel" placeholder="e.g. Electronics flips" value="Electronics flips" autocomplete="off" /></div>
             <div><label for="swCap">Max buy $</label><input id="swCap" type="number" min="0" placeholder="any" /></div>
@@ -288,6 +302,7 @@
             </div>
           </div>
         </div>
+        </details>
         <div id="swList" style="margin-top:14px"></div>
       </section>
 
@@ -573,7 +588,7 @@ async function loadWatchlists() {
       <td class="actions"><button class="ghost" data-run="${w.id}">Run</button><button class="ghost danger" data-del="${w.id}">✕</button></td>
     </tr>`).join("");
   $("wlList").innerHTML = data.watchlists.length
-    ? `<div class="panel"><table class="wl"><thead><tr><th>Query</th><th>Every</th><th>Last run</th><th>Found</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+    ? `<div class="panel"><div class="table-wrap"><table class="wl"><thead><tr><th>Query</th><th>Every</th><th>Last run</th><th>Found</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`
     : `<div class="state">No watchlists yet. Add one above to scan on a schedule.</div>`;
   $("wlList").querySelectorAll("[data-run]").forEach((b) => b.addEventListener("click", async () => {
     b.disabled = true; b.textContent = "…";
@@ -665,10 +680,43 @@ $("testAlert").addEventListener("click", async () => {
 
 // --- discover (sweeps) ---
 let starterKeywords = [];
+function renderDiscoverHero(sweeps) {
+  const active = sweeps.filter((s) => s.enabled);
+  const totalFound = sweeps.reduce((n, s) => n + (s.totalFound || 0), 0);
+  const cats = active.reduce((n, s) => n + s.keywords.length, 0);
+  const schedOn = config.watchInServer;
+  if (active.length) {
+    const sched = schedOn
+      ? `<span class="runstate"><span class="dot on"></span>running 24/7 — new deals auto-save to <b>Saved</b>${config.notifiers?.any ? " and alert you" : ""}</span>`
+      : `<span class="runstate"><span class="dot warn"></span>auto-run is off on the server — hit <b>Run next</b> below, or set <code>WATCH_IN_SERVER=true</code></span>`;
+    $("discoverHero").innerHTML = `<div class="hero">
+      <div class="htitle"><span class="dot on"></span>Auto-discovery is on</div>
+      <div class="hbody">The engine is hunting <b>${cats}</b> proven flip categories across all sources, comparing each find to live comps, and surfacing only what clears your thresholds. No need to know what to search — it looks for underpriced inventory for you. <b>${totalFound}</b> found so far.</div>
+      <div class="hrow">${sched}</div>
+    </div>`;
+  } else {
+    $("discoverHero").innerHTML = `<div class="hero">
+      <div class="htitle">Hunt flips on autopilot</div>
+      <div class="hbody">Not sure what to buy? Turn on auto-discovery and the engine continuously scans ${starterKeywords.length || 25} proven flip categories (consoles, tools, Apple, drones, sneakers…) across every source, comps each one, and saves the winners — no input from you.</div>
+      <div class="hrow"><button class="go big" id="enableAuto">⚡ Turn on auto-discovery</button>${config.watchInServer ? "" : `<span class="runstate"><span class="dot warn"></span>tip: set <code>WATCH_IN_SERVER=true</code> for 24/7 hunting</span>`}</div>
+    </div>`;
+    $("enableAuto").addEventListener("click", enableAutoDiscovery);
+  }
+}
+async function enableAutoDiscovery() {
+  const b = $("enableAuto"); b.disabled = true; b.textContent = "Starting…";
+  const r = await fetch("/api/sweeps", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label: "Auto-discovery", keywords: starterKeywords, source: "all", intervalMin: 30, perTick: 3, thresholds: thresholdsFromSliders() }) });
+  const d = await r.json();
+  if (!r.ok) { b.disabled = false; b.textContent = "⚡ Turn on auto-discovery"; return toast(d.error || "failed"); }
+  toast(`Auto-discovery on — hunting ${d.sweep.keywords.length} categories`);
+  loadSweeps();
+}
 async function loadSweeps() {
   const data = await (await fetch("/api/sweeps")).json();
   starterKeywords = data.starterKeywords || [];
   $("sweepCount").textContent = data.sweeps.length;
+  renderDiscoverHero(data.sweeps);
   const rows = data.sweeps.map((s) => {
     const pos = s.keywords.length ? `${(s.cursor % s.keywords.length)}/${s.keywords.length}` : "0/0";
     return `<tr>
@@ -681,8 +729,8 @@ async function loadSweeps() {
     </tr>`;
   }).join("");
   $("swList").innerHTML = data.sweeps.length
-    ? `<div class="panel"><table class="wl"><thead><tr><th>Sweep</th><th>Cadence</th><th>Cursor</th><th>Last / found</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
-    : `<div class="state">No discovery sweeps yet. Add one above (or load the starter pack) to constantly hunt new categories.</div>`;
+    ? `<div class="panel"><div class="table-wrap"><table class="wl"><thead><tr><th>Sweep</th><th>Cadence</th><th>Cursor</th><th>Last / found</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`
+    : "";
   $("swList").querySelectorAll("[data-run]").forEach((b) => b.addEventListener("click", async () => {
     b.disabled = true; b.textContent = "…";
     const r = await (await fetch(`/api/sweeps/${b.dataset.run}/run`, { method: "POST" })).json();
