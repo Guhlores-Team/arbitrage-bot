@@ -253,7 +253,7 @@
         <div class="panel" style="margin-top:14px"><h3>Engine</h3><div id="settingsEngine"></div></div>
         <div class="panel" style="margin-top:14px">
           <h3>Wire real data</h3>
-          <div class="kv"><span>Vision identify</span><span class="muted"><code>ANTHROPIC_API_KEY</code></span></div>
+          <div class="kv"><span>Vision identify</span><span class="muted"><code>ANTHROPIC_API_KEY</code> — or <code>LLM_PROVIDER=openrouter</code> + <code>OPENROUTER_API_KEY</code></span></div>
           <div class="kv"><span>eBay comps</span><span class="muted"><code>EBAY_CLIENT_ID/SECRET</code> · <code>EBAY_USE_MOCK_COMPS=false</code> · <code>EBAY_COMP_SOURCE=browse</code></span></div>
           <div class="kv"><span>Facebook</span><span class="muted"><code>npm run fb:login</code></span></div>
           <div class="kv"><span>Telegram / webhook alerts</span><span class="muted"><code>TELEGRAM_BOT_TOKEN</code>+<code>TELEGRAM_CHAT_ID</code> · <code>ALERT_WEBHOOK_URL</code></span></div>
@@ -473,6 +473,7 @@ async function renderSettings() {
     `<div class="kv"><span>Watch runner</span><span class="muted"><code>npm run watch</code></span></div>`;
   $("settingsEngine").innerHTML =
     `<div class="kv"><span>AI vision identify</span>${pill(config.hasAnthropicKey)}</div>` +
+    `<div class="kv"><span>LLM provider</span><span class="muted">${esc(config.llmProvider ?? "anthropic")} · ${esc(config.llmModel ?? "—")}</span></div>` +
     `<div class="kv"><span>eBay comp source</span><span class="muted">${esc(config.compSource ?? "mock")}</span></div>` +
     `<div class="kv"><span>Sources</span><span class="muted">${config.sources.join(", ")}</span></div>`;
   try {

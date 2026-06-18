@@ -1,8 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type { ProductIdentity, SourceListing } from "../types.js";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+import { complete, llmConfigured, type LlmImage } from "../llm.js";
 
 /**
  * Turn a messy local listing (vague title + photos) into a structured product
@@ -10,15 +7,16 @@ const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
  * are often useless ("box of tools $40"), so we let the model look at the
  * images to identify the actual product.
  *
- * Returns strict JSON. We cache by listing id upstream so we never re-pay for
- * the same listing.
+ * Uses whichever LLM provider is configured (Anthropic or OpenRouter). Returns
+ * strict JSON. We cache by listing id upstream so we never re-pay for the same
+ * listing.
  */
 export async function identifyProduct(listing: SourceListing): Promise<ProductIdentity> {
-  // No API key → run a heuristic identity so the pipeline (and dashboard) still
-  // work offline. Lower confidence reflects that no vision/LLM pass happened.
-  if (!process.env.ANTHROPIC_API_KEY) return heuristicIdentity(listing);
+  // No provider configured → run a heuristic identity so the pipeline (and
+  // dashboard) still work offline. Lower confidence reflects no vision/LLM pass.
+  if (!llmConfigured()) return heuristicIdentity(listing);
 
-  const imageBlocks = await buildImageBlocks(listing.imageUrls.slice(0, 4));
+  const images = await buildImages(listing.imageUrls.slice(0, 4));
 
   const system =
     "You identify the exact resale product from a marketplace listing. " +
@@ -41,18 +39,14 @@ Return JSON with exactly these fields:
   "searchString": string            // clean query to find sold comps, no fluff
 }`;
 
-  const msg = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 1000,
-    system,
-    messages: [{ role: "user", content: [...imageBlocks, { type: "text", text: prompt }] }],
-  });
-
-  const text = msg.content
-    .map((b) => (b.type === "text" ? b.text : ""))
-    .join("")
-    .replace(/```json|```/g, "")
-    .trim();
+  let text: string;
+  try {
+    text = (await complete({ system, prompt, images, maxTokens: 1000, model: process.env.IDENTIFY_MODEL }))
+      .replace(/```json|```/g, "")
+      .trim();
+  } catch {
+    return { condition: "unknown", confidence: 0, searchString: listing.rawTitle };
+  }
 
   try {
     const j = JSON.parse(text);
@@ -96,8 +90,8 @@ function heuristicIdentity(listing: SourceListing): ProductIdentity {
   return { condition, confidence: 0.4, searchString };
 }
 
-async function buildImageBlocks(urls: string[]): Promise<Anthropic.ImageBlockParam[]> {
-  const blocks: Anthropic.ImageBlockParam[] = [];
+async function buildImages(urls: string[]): Promise<LlmImage[]> {
+  const images: LlmImage[] = [];
   for (const url of urls) {
     try {
       const res = await fetch(url);
@@ -105,13 +99,10 @@ async function buildImageBlocks(urls: string[]): Promise<Anthropic.ImageBlockPar
       const type = res.headers.get("content-type") ?? "image/jpeg";
       if (!type.startsWith("image/")) continue;
       const b64 = Buffer.from(await res.arrayBuffer()).toString("base64");
-      blocks.push({
-        type: "image",
-        source: { type: "base64", media_type: type as any, data: b64 },
-      });
+      images.push({ mediaType: type, dataBase64: b64 });
     } catch {
       // skip unreachable images
     }
   }
-  return blocks;
+  return images;
 }

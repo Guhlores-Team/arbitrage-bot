@@ -49,9 +49,11 @@ export async function runPipeline(
     if (verified.length === 0) continue;
     const matchedComps = verified.map((v) => v.comp);
     const matchConfidence = avg(verified.map((v) => v.verdict.confidence));
+    // typical condition gap between the comps and our item (signed median)
+    const conditionDelta = median(verified.map((v) => v.verdict.conditionDelta));
 
-    // 4. fee-adjusted margin
-    const margin = computeMargin(listing.price, matchedComps, identity.category);
+    // 4. fee-adjusted, condition-adjusted margin
+    const margin = computeMargin(listing.price, matchedComps, identity.category, undefined, conditionDelta);
 
     // 5. score
     const { score, passes, flags } = scoreOpportunity(
@@ -64,6 +66,11 @@ export async function runPipeline(
       },
       opts.thresholds ?? THRESHOLDS,
     );
+
+    // resale-confidence flags: rougher comp basis / applied condition discount
+    if (comper.basis === "ask") flags.push("resale based on active asks (estimate, discounted)");
+    if (comper.basis === "mock") flags.push("mock comps — not real resale data");
+    if (margin.conditionDiscount > 0) flags.push(`condition discount −$${margin.conditionDiscount} vs comps`);
 
     opportunities.push({
       sourceListing: listing,

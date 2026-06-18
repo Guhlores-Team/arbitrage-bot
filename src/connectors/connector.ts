@@ -25,5 +25,7 @@ export interface SourceConnector {
  */
 export interface CompConnector {
   readonly market: string;
+  /** what the comp prices represent: realized sales, active asks, or mock data */
+  readonly basis?: "sold" | "ask" | "mock";
   getSoldComps(searchString: string, limit?: number): Promise<SoldComp[]>;
 }

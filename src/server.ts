@@ -10,6 +10,7 @@ import { store } from "./store.js";
 import { notify, notifierStatus, notifyOpportunities } from "./notify.js";
 import { EbayCompConnector } from "./connectors/ebay.js";
 import { health } from "./health.js";
+import { llmInfo } from "./llm.js";
 
 /**
  * Dashboard server. Zero external deps — Node's http only — so it starts with
@@ -50,10 +51,13 @@ const server = createServer(async (req, res) => {
     const method = req.method ?? "GET";
 
     if (method === "GET" && path === "/api/config") {
+      const llm = llmInfo();
       return json(res, 200, {
         sources: SOURCES,
         thresholds: THRESHOLDS,
-        hasAnthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
+        hasAnthropicKey: llm.configured, // back-compat: dashboard reads this as "identify on"
+        llmProvider: llm.provider,
+        llmModel: llm.model,
         ebayMockComps: (process.env.EBAY_USE_MOCK_COMPS ?? "true") === "true",
         compSource: new EbayCompConnector().effectiveSource,
         notifiers: notifierStatus(),

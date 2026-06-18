@@ -104,6 +104,32 @@ TELEGRAM_BOT_TOKEN=...   TELEGRAM_CHAT_ID=...   # Telegram
 ALERT_WEBHOOK_URL=https://hooks.slack.com/...  # Slack / Discord / generic webhook
 ```
 
+## LLM provider: Anthropic or OpenRouter
+
+Identify + match run through a provider layer (`src/llm.ts`). Default is
+Anthropic; set `LLM_PROVIDER=openrouter` to use OpenRouter instead — one key,
+many models, and per-step routing:
+
+```bash
+LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=...
+OPENROUTER_MODEL=anthropic/claude-sonnet-4   # any OpenRouter model id
+IDENTIFY_MODEL=...   MATCH_MODEL=...          # optional: cheap model for match,
+                                              # strong vision model for identify
+```
+
+No key for the active provider → identify/match fall back to offline heuristics.
+
+## Profit accuracy
+
+- **Condition-adjusted resale** — the match step's condition gap discounts the
+  resale estimate (a "good" unit isn't priced like a "like-new" comp); never
+  inflates when your item is the nicer one. Tune with `CONDITION_STEP_PCT`.
+- **Outlier-trimmed comps** — comps outside 1.5×IQR are dropped before the
+  median, so one mis-matched comp can't skew value.
+- **Resale-confidence flags** — opportunities are flagged when comps are active
+  asks (`browse`) or mock data, and when a condition discount was applied.
+
 ## eBay comps: sold vs. active
 
 `EBAY_COMP_SOURCE` selects how items are valued (default `auto`):

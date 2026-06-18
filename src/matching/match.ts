@@ -1,8 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type { MatchVerdict, ProductIdentity, SoldComp } from "../types.js";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+import { complete, llmConfigured } from "../llm.js";
 
 // Simple in-process verdict cache: (identity.searchString + comp.id) -> verdict.
 // Swap for a DB/Redis cache when you persist.
@@ -40,9 +37,7 @@ export async function verifyMatches(
     const key = `${identity.searchString}::${comp.id}`;
     let verdict = verdictCache.get(key);
     if (!verdict) {
-      verdict = process.env.ANTHROPIC_API_KEY
-        ? await llmVerify(identity, comp)
-        : heuristicVerify(identity, comp);
+      verdict = llmConfigured() ? await llmVerify(identity, comp) : heuristicVerify(identity, comp);
       verdictCache.set(key, verdict);
     }
     if (verdict.isMatch) results.push({ comp, verdict });
@@ -87,12 +82,9 @@ Respond with ONLY JSON:
 conditionDelta = (B condition rank) - (A condition rank), ranks: new=4 like_new=3 good=2 fair=1 for_parts=0.`;
 
   try {
-    const msg = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 300,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").replace(/```json|```/g, "").trim();
+    const text = (await complete({ prompt, maxTokens: 300, model: process.env.MATCH_MODEL }))
+      .replace(/```json|```/g, "")
+      .trim();
     const j = JSON.parse(text);
     return {
       isMatch: !!j.isMatch,

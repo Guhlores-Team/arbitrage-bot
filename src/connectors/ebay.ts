@@ -37,6 +37,12 @@ export class EbayCompConnector implements CompConnector {
     return this.compSource;
   }
 
+  /** What the comp prices represent — drives the resale-confidence flag. */
+  get basis(): "sold" | "ask" | "mock" {
+    const s = this.effectiveSource;
+    return s === "mock" ? "mock" : s === "browse" ? "ask" : "sold";
+  }
+
   async getSoldComps(searchString: string, limit = 20): Promise<SoldComp[]> {
     if (this.useMock || !this.clientId) return this.mockComps(searchString, limit);
 

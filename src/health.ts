@@ -1,6 +1,7 @@
 import { stat, readdir } from "node:fs/promises";
 import { EbayCompConnector } from "./connectors/ebay.js";
 import { notifierStatus } from "./notify.js";
+import { llmInfo } from "./llm.js";
 
 /**
  * Preflight: can each source actually run, and is the money path (comps +
@@ -51,7 +52,7 @@ export async function health() {
             ? "live active asks (discounted to sold estimate)"
             : "live data",
     },
-    identify: process.env.ANTHROPIC_API_KEY ? "ai-vision" : "offline-heuristic",
+    identify: llmInfo().configured ? `ai-vision (${llmInfo().provider}/${llmInfo().model})` : "offline-heuristic",
     notifiers: notifierStatus(),
   };
 }
