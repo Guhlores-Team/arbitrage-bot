@@ -4,9 +4,9 @@
   "schemaVersion": 1,
   "properties": {
     "query": { "title": "Search query", "type": "string", "description": "What to search Nextdoor For Sale & Free for.", "editor": "textfield", "prefill": "free" },
-    "maxItems": { "title": "Max listings", "type": "integer", "default": 24, "minimum": 1, "maximum": 200 },
-    "maxScrolls": { "title": "Max scrolls", "type": "integer", "default": 12, "minimum": 1, "maximum": 60 },
-    "maxPrice": { "title": "Max price", "type": "integer", "nullable": true, "minimum": 0 },
+    "maxItems": { "title": "Max listings", "type": "integer", "description": "Maximum number of listings to return.", "default": 24, "minimum": 1, "maximum": 200 },
+    "maxScrolls": { "title": "Max scrolls", "type": "integer", "description": "Maximum number of page scrolls to load more results.", "default": 12, "minimum": 1, "maximum": 60 },
+    "maxPrice": { "title": "Max price", "type": "integer", "description": "Only return listings at or below this price (optional).", "nullable": true, "minimum": 0 },
     "cookies": { "title": "Nextdoor cookies", "type": "array", "description": "Your logged-in Nextdoor cookies as a JSON array (export with the Cookie-Editor extension). Required — Nextdoor needs an authenticated session.", "editor": "json", "nullable": true },
     "proxyConfiguration": { "title": "Proxy", "type": "object", "editor": "proxy", "default": { "useApifyProxy": true, "apifyProxyGroups": ["RESIDENTIAL"] } }
   },
