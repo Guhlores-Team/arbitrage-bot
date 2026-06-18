@@ -3,7 +3,7 @@ import { identifyProduct } from "./extraction/identify.js";
 import { verifyMatches } from "./matching/match.js";
 import { computeMargin } from "./valuation/value.js";
 import { scoreOpportunity, THRESHOLDS, type Thresholds } from "./scoring/score.js";
-import type { Opportunity } from "./types.js";
+import type { Opportunity, MarketStat, SoldComp } from "./types.js";
 
 export interface PipelineOpts {
   /** skip identify/comp when the source price already exceeds this cap */
@@ -67,16 +67,21 @@ export async function runPipeline(
       opts.thresholds ?? THRESHOLDS,
     );
 
-    // resale-confidence flags: rougher comp basis / applied condition discount
+    // resale-confidence flags: rougher comp basis / discount / dispersion
     if (comper.basis === "ask") flags.push("resale based on active asks (estimate, discounted)");
     if (comper.basis === "mock") flags.push("mock comps — not real resale data");
     if (margin.conditionDiscount > 0) flags.push(`condition discount −$${margin.conditionDiscount} vs comps`);
+    if (margin.spread > 0.6) flags.push("wide price spread — resale uncertain");
 
     opportunities.push({
       sourceListing: listing,
       identity,
       referencePrice: margin.referencePrice,
+      resaleLow: margin.resaleLow,
+      resaleMid: margin.resaleMid,
+      resaleHigh: margin.resaleHigh,
       compCount: matchedComps.length,
+      marketBreakdown: marketBreakdown(matchedComps),
       matchConfidence,
       estimatedFees: margin.estimatedFees,
       estimatedShipping: margin.estimatedShipping,
@@ -98,5 +103,17 @@ function median(xs: number[]): number {
 }
 function avg(xs: number[]): number {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+}
+
+/** Group matched comps by sell market with a count + median price each. */
+function marketBreakdown(comps: SoldComp[]): MarketStat[] {
+  const by = new Map<string, number[]>();
+  for (const c of comps) {
+    const m = c.market ?? "ebay";
+    (by.get(m) ?? by.set(m, []).get(m)!).push(c.soldPrice);
+  }
+  return [...by.entries()]
+    .map(([market, prices]) => ({ market, count: prices.length, median: Math.round(median(prices)) }))
+    .sort((a, b) => b.count - a.count);
 }
 export { THRESHOLDS };

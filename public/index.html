@@ -377,7 +377,7 @@ function card(o) {
       <div><div class="title">${esc(o.title)}</div><div class="sub">${esc(sub)} · ${esc(o.location || "—")} · ${o.compCount} comps</div></div>
       <div class="figs">
         <div class="fig"><div class="k">Buy</div><div class="v">$${o.buy || "?"}</div></div>
-        <div class="fig"><div class="k">Resale</div><div class="v">$${o.resale}</div></div>
+        <div class="fig"><div class="k">Resale</div><div class="v">$${o.resale}</div><div class="k" style="margin-top:2px">$${o.resaleLow ?? o.resale}–$${o.resaleHigh ?? o.resale}</div></div>
         <div class="fig"><div class="k">Net</div><div class="v ${netCls}">$${o.net}</div></div>
       </div>
       <div class="meter"><span style="width:${Math.max(0, Math.min(100, o.marginPct*100)).toFixed(0)}%"></span></div>
@@ -387,6 +387,7 @@ function card(o) {
         <span class="chip">id ${Math.round(o.identityConfidence*100)}%</span>
         <span class="chip">−$${o.fees} fees</span>
       </div>
+      ${(o.markets && o.markets.length) ? `<div class="chips">${o.markets.map((m) => `<span class="chip">${esc(m.market)} ${m.count}·$${m.median}</span>`).join("")}</div>` : ""}
       ${flags ? `<div class="chips">${flags}</div>` : ""}
       <div class="foot"><span class="muted">${esc(o.condition)}</span><a class="view-link" href="${esc(o.url)}" target="_blank" rel="noopener">View ↗</a></div>
     </div>

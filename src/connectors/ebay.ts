@@ -44,6 +44,10 @@ export class EbayCompConnector implements CompConnector {
   }
 
   async getSoldComps(searchString: string, limit = 20): Promise<SoldComp[]> {
+    return (await this.fetchComps(searchString, limit)).map((c) => ({ ...c, market: "ebay" }));
+  }
+
+  private async fetchComps(searchString: string, limit: number): Promise<SoldComp[]> {
     if (this.useMock || !this.clientId) return this.mockComps(searchString, limit);
 
     switch (this.compSource) {

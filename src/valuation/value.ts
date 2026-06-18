@@ -15,6 +15,14 @@ export function trimOutliers(prices: number[]): number[] {
   return kept.length ? kept : s;
 }
 
+/** Percentile of an unsorted array via nearest-rank (p in 0..1). */
+export function percentile(xs: number[], p: number): number {
+  if (!xs.length) return 0;
+  const s = [...xs].sort((a, b) => a - b);
+  const idx = Math.round((s.length - 1) * Math.max(0, Math.min(1, p)));
+  return s[idx];
+}
+
 function median(xs: number[]): number {
   if (!xs.length) return 0;
   const s = [...xs].sort((a, b) => a - b);
@@ -27,25 +35,39 @@ export function referencePrice(comps: SoldComp[]): number {
   return median(trimOutliers(comps.map((c) => c.soldPrice)));
 }
 
+/**
+ * The conservative percentile of the resale range we use for the profit calc.
+ * Slightly below median so a deal has to clear the bar on a *pessimistic* sale
+ * price, not a best-case one. Tunable via RESALE_PERCENTILE (0..1).
+ */
+const RESALE_PCT = clampUnit(Number(process.env.RESALE_PERCENTILE ?? 0.4), 0.4);
+
 export interface Margin {
+  /** conservative, condition-adjusted resale used for the net calc */
   referencePrice: number;
+  /** resale RANGE across the (trimmed, condition-adjusted) comps */
+  resaleLow: number;
+  resaleMid: number;
+  resaleHigh: number;
+  /** (high-low)/mid — how dispersed the comps are (uncertainty signal) */
+  spread: number;
   estimatedFees: number;
   estimatedShipping: number;
   netProfit: number;
   marginPct: number;
-  /** how much the condition gap discounted the raw comp median (0 = none) */
+  /** how much the condition gap discounted the comps (0 = none) */
   conditionDiscount: number;
 }
 
 /**
- * A price gap is NOT profit. Net out fees, shipping, and your buy cost.
+ * A price gap is NOT profit. Net out fees, shipping, and your buy cost — and
+ * value against a price RANGE, not one number.
  *
- * `conditionDelta` is the signed median of (comp rank − item rank) from the
- * match step: positive means the comps are in BETTER shape than the item, so we
- * discount the resale estimate (a "good" unit won't fetch a "like-new" price).
- * We never inflate when the item is the nicer one — that stays conservative.
- *
- * marginPct is relative to the resale price so it's comparable across items.
+ * We trim outlier comps, take low/median/high percentiles, and base the profit
+ * on a conservative point (RESALE_PERCENTILE, default p40) so we don't sell the
+ * deal on a best-case price. `conditionDelta` (signed median of comp rank −
+ * item rank from the match step) discounts the whole range when the comps are
+ * nicer than the item; we never inflate when the item is the nicer one.
  */
 export function computeMargin(
   buyCost: number,
@@ -54,21 +76,36 @@ export function computeMargin(
   fees?: FeeConfig,
   conditionDelta = 0,
 ): Margin {
-  const raw = referencePrice(comps);
-  const discountFactor = conditionDelta > 0 ? Math.max(0, 1 - conditionDelta * CONDITION_STEP) : 1;
-  const ref = Math.round(raw * discountFactor);
+  const trimmed = trimOutliers(comps.map((c) => c.soldPrice));
+  const discount = conditionDelta > 0 ? Math.max(0, 1 - conditionDelta * CONDITION_STEP) : 1;
+  const adj = (x: number) => Math.round(x * discount);
+
+  const rawMid = median(trimmed);
+  const resaleLow = adj(percentile(trimmed, 0.25));
+  const resaleMid = adj(rawMid);
+  const resaleHigh = adj(percentile(trimmed, 0.75));
+  const ref = adj(percentile(trimmed, RESALE_PCT)); // conservative point for net
+  const spread = resaleMid > 0 ? (resaleHigh - resaleLow) / resaleMid : 0;
 
   const f = estimateFees(ref, fees);
   const ship = estimateShipping(category);
   const net = ref - f - ship - buyCost;
   return {
     referencePrice: ref,
+    resaleLow,
+    resaleMid,
+    resaleHigh,
+    spread,
     estimatedFees: f,
     estimatedShipping: ship,
     netProfit: net,
     marginPct: ref > 0 ? net / ref : 0,
-    conditionDiscount: raw - ref,
+    conditionDiscount: Math.round(rawMid) - resaleMid,
   };
+}
+
+function clampUnit(n: number, fallback: number): number {
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : fallback;
 }
 
 function clamp01(n: number): number {

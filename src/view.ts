@@ -10,8 +10,11 @@ export interface OpportunityView {
   url: string;
   location: string | null;
   buy: number;
-  resale: number;
+  resale: number; // mid/point estimate (back-compat)
+  resaleLow: number;
+  resaleHigh: number;
   net: number;
+  markets: { market: string; count: number; median: number }[];
   marginPct: number;
   fees: number;
   shipping: number;
@@ -38,8 +41,11 @@ export function toOpportunityView(o: Opportunity): OpportunityView {
     url: o.sourceListing.url,
     location: o.sourceListing.location ?? null,
     buy: o.sourceListing.price,
-    resale: o.referencePrice,
+    resale: o.resaleMid,
+    resaleLow: o.resaleLow,
+    resaleHigh: o.resaleHigh,
     net: Math.round(o.netProfit),
+    markets: o.marketBreakdown,
     marginPct: o.marginPct,
     fees: Math.round(o.estimatedFees),
     shipping: o.estimatedShipping,

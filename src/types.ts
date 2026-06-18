@@ -51,6 +51,15 @@ export interface SoldComp {
   condition: Condition;
   soldAt?: string; // ISO
   url: string;
+  /** which sell market this comp came from (ebay, pricecharting, amazon …) */
+  market?: string;
+}
+
+/** Per-market summary of the comps behind a valuation. */
+export interface MarketStat {
+  market: string;
+  count: number;
+  median: number;
 }
 
 /** Verdict from the LLM match-verification step. */
@@ -66,8 +75,12 @@ export interface MatchVerdict {
 export interface Opportunity {
   sourceListing: SourceListing;
   identity: ProductIdentity;
-  referencePrice: number; // median of matched sold comps
+  referencePrice: number; // conservative resale used for the net calc
+  resaleLow: number; // resale RANGE across matched comps
+  resaleMid: number;
+  resaleHigh: number;
   compCount: number;
+  marketBreakdown: MarketStat[]; // comps per sell market (eBay vs PriceCharting …)
   matchConfidence: number;
   estimatedFees: number;
   estimatedShipping: number;

@@ -22,6 +22,10 @@ export class PriceChartingConnector implements CompConnector {
   }
 
   async getSoldComps(searchString: string, limit = 20): Promise<SoldComp[]> {
+    return (await this.fetch(searchString, limit)).map((c) => ({ ...c, market: "pricecharting" }));
+  }
+
+  private async fetch(searchString: string, limit: number): Promise<SoldComp[]> {
     if (this.useMock) return this.mock(searchString, limit);
     const url = "https://www.pricecharting.com/api/products?" + new URLSearchParams({ t: this.token, q: searchString });
     const res = await fetch(url);
