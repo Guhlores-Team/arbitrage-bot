@@ -1,3 +1,4 @@
+import "./env.js";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -22,6 +23,9 @@ import type { Opportunity } from "./types.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
 const PORT = Number(process.env.PORT ?? 3000);
+// Bind to loopback by default: this server triggers scraping and (with keys)
+// paid API calls, so it must not be reachable from the network unless you opt in.
+const HOST = process.env.HOST ?? "127.0.0.1";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -74,11 +78,13 @@ async function handleSearch(res: any, body: any) {
     : undefined;
 
   const started = Date.now();
-  const opps = await runPipeline(
-    pickSource(source),
-    new EbayCompConnector(),
-    { query, maxPrice, limit },
-    { hardPriceCap: maxPrice, thresholds },
+  const opps = await serialize(() =>
+    runPipeline(
+      pickSource(source),
+      new EbayCompConnector(),
+      { query, maxPrice, limit },
+      { hardPriceCap: maxPrice, thresholds },
+    ),
   );
 
   return json(res, 200, {
@@ -132,6 +138,18 @@ async function serveStatic(res: any, pathname: string) {
   }
 }
 
+// Serialize pipeline runs: only one scan executes at a time, so concurrent
+// requests can't spin up multiple browser contexts (Facebook/OfferUp) at once.
+let chain: Promise<unknown> = Promise.resolve();
+function serialize<T>(fn: () => Promise<T>): Promise<T> {
+  const run = chain.then(fn, fn);
+  chain = run.then(
+    () => {},
+    () => {},
+  );
+  return run;
+}
+
 function readBody(req: any): Promise<any> {
   return new Promise((resolve, reject) => {
     let raw = "";
@@ -156,8 +174,8 @@ function json(res: any, status: number, payload: unknown) {
   res.end(data);
 }
 
-server.listen(PORT, () => {
-  console.log(`\n  Arbitrage dashboard → http://localhost:${PORT}\n`);
+server.listen(PORT, HOST, () => {
+  console.log(`\n  Arbitrage dashboard → http://${HOST}:${PORT}\n`);
   if (!process.env.ANTHROPIC_API_KEY) {
     console.log("  (no ANTHROPIC_API_KEY: identify/match run in offline heuristic mode)");
   }

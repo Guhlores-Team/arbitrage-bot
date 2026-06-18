@@ -1,3 +1,4 @@
+import "./env.js";
 import { EbayCompConnector } from "./connectors/ebay.js";
 import { pickSource } from "./sources.js";
 import { runPipeline } from "./pipeline.js";

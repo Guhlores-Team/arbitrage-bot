@@ -34,7 +34,7 @@ export class MockSourceConnector implements SourceConnector {
       const price = Math.max(5, Math.round(market * t.factor));
       out.push({
         id: `demo_${hash(base + i)}`,
-        source: "demo" as any,
+        source: "demo",
         rawTitle: `${capitalize(base)} ${t.suffix}`,
         description: `Selling my ${base}. Condition: ${t.cond}. Cash only, local pickup.`,
         price,

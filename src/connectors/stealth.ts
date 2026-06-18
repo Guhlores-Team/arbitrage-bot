@@ -80,7 +80,7 @@ export const STEALTH_INIT_SCRIPT = `
   Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
   window.chrome = window.chrome || { runtime: {} };
   const _query = window.navigator.permissions && window.navigator.permissions.query;
-  if (_query) {
+  if (_query && typeof Notification !== 'undefined') {
     window.navigator.permissions.query = (p) =>
       p && p.name === 'notifications'
         ? Promise.resolve({ state: Notification.permission })
