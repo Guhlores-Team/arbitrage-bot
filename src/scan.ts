@@ -1,5 +1,5 @@
-import { EbayCompConnector } from "./connectors/ebay.js";
-import { pickSource, SOURCES } from "./sources.js";
+import { resolveSource, isValidSourceSpec } from "./sources.js";
+import { buildComper } from "./comps.js";
 import { runPipeline } from "./pipeline.js";
 import { THRESHOLDS, type Thresholds } from "./scoring/score.js";
 import { toOpportunityView, type OpportunityView } from "./view.js";
@@ -30,7 +30,8 @@ export function parseScanParams(body: any): ScanParams {
   const query = String(body?.query ?? "").trim();
   const source = String(body?.source ?? "demo");
   if (!query) throw new Error("query is required");
-  if (!SOURCES.includes(source as any)) throw new Error(`unknown source "${source}"`);
+  // source may be a single name, "all", or a comma-separated list
+  if (!isValidSourceSpec(source)) throw new Error(`unknown source "${source}"`);
   return {
     query,
     source,
@@ -50,8 +51,8 @@ export function parseScanParams(body: any): ScanParams {
 export async function runScan(p: ScanParams): Promise<ScanResult> {
   const started = Date.now();
   const opps = await runPipeline(
-    pickSource(p.source),
-    new EbayCompConnector(),
+    resolveSource(p.source),
+    buildComper(),
     { query: p.query, maxPrice: p.maxPrice, limit: p.limit },
     { hardPriceCap: p.maxPrice, thresholds: p.thresholds },
   );

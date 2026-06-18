@@ -23,10 +23,15 @@ so new sources slot in without touching the engine.
   watchlists); Prisma/Postgres schema included as the upgrade path.
 - **Craigslist source connector** — uses Craigslist's built-in RSS feed. No
   login, no headless browser. The lowest-friction first source.
-- **Facebook Marketplace + OfferUp source connectors** — browser-driven
+- **Facebook Marketplace + OfferUp + Mercari source connectors** — browser-driven
   (Playwright) with **anti-detection hardening** (see below). Facebook uses a
-  persistent logged-in session; OfferUp browses public results. Optional
+  persistent logged-in session; OfferUp + Mercari browse public results. Optional
   dependency; the rest of the engine runs without it.
+- **Multi-source scanning** — target `all` sources (or a comma list) in one pass;
+  results merge + de-dupe, and a blocked/erroring source never sinks the scan.
+- **Multi-market comps** — value against several sell markets at once via
+  `COMP_SOURCES` (e.g. `ebay,pricecharting`). **PriceCharting** connector covers
+  games/consoles/cards (real API + mock fallback).
 - **eBay comp connector** — real OAuth + Marketplace Insights request shape,
   with a mock-comps fallback so the pipeline runs before you're approved for
   sold-data access.
@@ -191,6 +196,14 @@ No key for the active provider → identify/match fall back to offline heuristic
 
 Set `EBAY_CLIENT_ID`/`EBAY_CLIENT_SECRET` and `EBAY_USE_MOCK_COMPS=false` to go
 live. Browse asks are a rougher comp than solds, but free and ungated.
+
+**Multiple comp markets:** `COMP_SOURCES=ebay,pricecharting` blends them so resale
+triangulates across markets. PriceCharting (games/consoles/cards) needs
+`PRICECHARTING_TOKEN` to go live, else returns mock comps.
+
+**Scanning everywhere:** pass `--source=all` (CLI) or pick "all sources" in the
+dashboard / watchlists / sweeps to hit Craigslist + Facebook + OfferUp + Mercari
+in one query; you can also give a comma list like `craigslist,offerup,mercari`.
 
 ## Facebook Marketplace (scrape-with-safeguards)
 

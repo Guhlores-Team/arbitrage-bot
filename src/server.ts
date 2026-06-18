@@ -8,9 +8,9 @@ import { THRESHOLDS } from "./scoring/score.js";
 import { parseScanParams, runScan } from "./scan.js";
 import { store } from "./store.js";
 import { notify, notifierStatus, notifyOpportunities } from "./notify.js";
-import { EbayCompConnector } from "./connectors/ebay.js";
 import { health } from "./health.js";
 import { llmInfo } from "./llm.js";
+import { compInfo } from "./comps.js";
 import { startWatch } from "./watch.js";
 import { STARTER_KEYWORDS } from "./sweep.js";
 
@@ -61,7 +61,8 @@ const server = createServer(async (req, res) => {
         llmProvider: llm.provider,
         llmModel: llm.model,
         ebayMockComps: (process.env.EBAY_USE_MOCK_COMPS ?? "true") === "true",
-        compSource: new EbayCompConnector().effectiveSource,
+        compSource: compInfo().markets,
+        compBasis: compInfo().basis,
         notifiers: notifierStatus(),
       });
     }

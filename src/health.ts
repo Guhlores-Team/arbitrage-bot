@@ -1,5 +1,5 @@
 import { stat, readdir } from "node:fs/promises";
-import { EbayCompConnector } from "./connectors/ebay.js";
+import { compInfo } from "./comps.js";
 import { notifierStatus } from "./notify.js";
 import { llmInfo } from "./llm.js";
 
@@ -18,7 +18,6 @@ export interface SourceHealth {
 export async function health() {
   const playwright = await hasPlaywright();
   const fbSession = await dirHasFiles(process.env.FACEBOOK_USER_DATA_DIR ?? ".fb-session");
-  const comper = new EbayCompConnector();
 
   const sources: SourceHealth[] = [
     { source: "demo", ready: true, note: "offline sample data" },
@@ -37,20 +36,26 @@ export async function health() {
       ready: playwright,
       note: playwright ? "ready (public browse)" : "install Playwright",
     },
+    {
+      source: "mercari",
+      ready: playwright,
+      note: playwright ? "ready (public browse)" : "install Playwright",
+    },
   ];
 
+  const comps = compInfo();
   return {
     playwright,
     sources,
     comps: {
-      source: comper.effectiveSource,
-      live: comper.effectiveSource !== "mock",
+      source: comps.markets,
+      live: comps.basis !== "mock",
       note:
-        comper.effectiveSource === "mock"
-          ? "mock comps — set EBAY_* keys + EBAY_USE_MOCK_COMPS=false"
-          : comper.effectiveSource === "browse"
+        comps.basis === "mock"
+          ? "mock comps — set EBAY_* keys (EBAY_USE_MOCK_COMPS=false) and/or PRICECHARTING_TOKEN"
+          : comps.basis === "ask"
             ? "live active asks (discounted to sold estimate)"
-            : "live data",
+            : "live sold/market data",
     },
     identify: llmInfo().configured ? `ai-vision (${llmInfo().provider}/${llmInfo().model})` : "offline-heuristic",
     notifiers: notifierStatus(),

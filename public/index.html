@@ -322,7 +322,8 @@ document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () 
 
 async function loadConfig() {
   config = await (await fetch("/api/config")).json();
-  const opts = config.sources.map((s) => `<option value="${s}">${s}</option>`).join("");
+  const liveCount = config.sources.filter((s) => s !== "demo").length;
+  const opts = `<option value="all">all sources (${liveCount})</option>` + config.sources.map((s) => `<option value="${s}">${s}</option>`).join("");
   $("source").innerHTML = opts; $("wlSource").innerHTML = opts; $("swSource").innerHTML = opts;
   $("source").value = config.sources.includes("demo") ? "demo" : config.sources[0];
   $("swSource").value = $("source").value;

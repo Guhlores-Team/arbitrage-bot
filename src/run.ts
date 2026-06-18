@@ -1,6 +1,6 @@
 import "./env.js";
-import { EbayCompConnector } from "./connectors/ebay.js";
-import { pickSource } from "./sources.js";
+import { buildComper } from "./comps.js";
+import { resolveSource } from "./sources.js";
 import { runPipeline } from "./pipeline.js";
 
 /**
@@ -27,10 +27,10 @@ async function main() {
 
   const query = positional[0] ?? "nintendo switch";
   const cap = positional[1] ? Number(positional[1]) : undefined;
-  const sourceName = flags.get("source") ?? "craigslist";
+  const sourceName = flags.get("source") ?? "craigslist"; // single name, "all", or "a,b,c"
 
-  const source = pickSource(sourceName);
-  const comper = new EbayCompConnector();
+  const source = resolveSource(sourceName);
+  const comper = buildComper();
 
   console.log(`\nSearching ${sourceName} for "${query}"${cap ? ` under $${cap}` : ""}...\n`);
 
