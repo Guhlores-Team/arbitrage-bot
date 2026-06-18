@@ -4,6 +4,6 @@
   "type": "module",
   "description": "Scrape Nextdoor 'For Sale & Free' listings — title, price, image and URL — with your login cookies and a residential proxy.",
   "engines": { "node": ">=18" },
-  "dependencies": { "apify": "^3.2.6", "crawlee": "^3.11.5" },
+  "dependencies": { "apify": "^3.2.6", "crawlee": "^3.11.5", "playwright": "*" },
   "scripts": { "start": "node src/main.js" }
 }

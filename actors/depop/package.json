@@ -4,6 +4,6 @@
   "type": "module",
   "description": "Scrape Depop search results — title, price, image and listing URL — for fashion/vintage sourcing.",
   "engines": { "node": ">=18" },
-  "dependencies": { "apify": "^3.2.6", "crawlee": "^3.11.5" },
+  "dependencies": { "apify": "^3.2.6", "crawlee": "^3.11.5", "playwright": "*" },
   "scripts": { "start": "node src/main.js" }
 }
