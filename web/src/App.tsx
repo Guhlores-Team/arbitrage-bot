@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Deal, Game, OutcomePatch, Stage, View, SourceHealth, ClassId } from "./types";
-import { fetchDeals, patchDeal, runScan, fetchGame, saveGame, fetchHealth, createManual } from "./api";
+import { fetchDeals, patchDeal, runScan, fetchGame, saveGame, fetchHealth, createManual, createWatchlist } from "./api";
 import { downscale } from "./img";
 import { dealNet, dealRoi, conf } from "./lib";
 import { computeHero, computeQuests, computeBoss, buffsFrom, relicsOwned, RELIC_SLOTS, SKILLS } from "./progression";
@@ -17,6 +17,7 @@ import Party from "./components/Party";
 import Boss from "./components/Boss";
 import Hoard from "./components/Hoard";
 import WarTable from "./components/WarTable";
+import Bestiary from "./components/Bestiary";
 import CoinBurst from "./components/CoinBurst";
 
 export interface Filters { q: string; source: string; stage: string; sort: "net" | "roi" | "conf" | "score"; }
@@ -118,6 +119,17 @@ export default function App() {
 
   const pickRealm = useCallback((source: string) => { setFilters((f) => ({ ...f, source })); switchView("hunt"); }, [switchView]);
 
+  const huntTerm = useCallback(async (term: string, source: string) => {
+    flash(`🧭 Hunting "${term}" on ${source}…`);
+    await runScan(term, source, (s) => flash(s === "done" ? `Scan complete: ${term}` : "Scan failed"));
+    await load();
+  }, [flash, load]);
+
+  const watchTerm = useCallback(async (term: string, source: string) => {
+    await createWatchlist({ query: term, source, intervalMin: 60 });
+    flash(`👁 Watching "${term}" on ${source}`);
+  }, [flash]);
+
   const snapRef = useRef<HTMLInputElement>(null);
   const onSnapFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
@@ -145,6 +157,7 @@ export default function App() {
           {view === "boss" && <Boss boss={boss} bossMult={buffs.bossMult} />}
           {view === "hoard" && <Hoard owned={owned} equipped={equipped} onToggle={toggleRelic} />}
           {view === "war" && <WarTable onToast={flash} />}
+          {view === "bestiary" && <Bestiary onHunt={huntTerm} onWatch={watchTerm} />}
         </div>
       </main>
       <input ref={snapRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={onSnapFile} />

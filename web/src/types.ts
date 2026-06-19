@@ -23,7 +23,7 @@ export interface Deal {
   notes?: string;
 }
 
-export type View = "ledger" | "hunt" | "realms" | "party" | "quests" | "classv" | "boss" | "hoard" | "war";
+export type View = "ledger" | "hunt" | "realms" | "party" | "quests" | "classv" | "boss" | "hoard" | "war" | "bestiary";
 
 export type ClassId = "hunter" | "scrapper" | "merchant";
 

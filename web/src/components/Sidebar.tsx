@@ -10,6 +10,7 @@ function mask(name: string) {
 const NAV: { icon: string; label: string; view?: View }[] = [
   { icon: "scroll-unfurled", label: "Ledger", view: "ledger" },
   { icon: "crossed-swords", label: "The Hunt", view: "hunt" },
+  { icon: "scroll-unfurled", label: "Bestiary", view: "bestiary" },
   { icon: "all-for-one", label: "Party", view: "party" },
   { icon: "anchor", label: "Realms", view: "realms" },
   { icon: "archery-target", label: "Quests", view: "quests" },
