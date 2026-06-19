@@ -119,28 +119,31 @@ async function seedDefaultSweep(): Promise<void> {
 }
 
 async function runOne(wl: Watchlist): Promise<void> {
-  const tag = `[${wl.source}] "${wl.query}"`;
+  // A watchlist query may hold several comma-separated terms ("switch, lego, ps5");
+  // scan each separately so a multi-keyword watchlist actually returns results
+  // instead of searching for the whole literal string (which matches nothing).
+  const terms = wl.query.split(",").map((t) => t.trim()).filter(Boolean);
+  const queries = terms.length ? terms : [wl.query];
   resetSerpApiSearchCount(); // per-tick SerpApi budget + fresh monthly read
-  try {
-    const res = await runScan({
-      query: wl.query,
-      source: wl.source,
-      maxPrice: wl.maxPrice,
-      thresholds: wl.thresholds,
-    });
-    const passing = res.opportunities.filter((o) => o.passes);
-    const added = passing.length ? await store.saveOpportunities(passing, { source: wl.source, query: wl.query }) : [];
-    await store.updateWatchlist(wl.id, { lastRunAt: new Date().toISOString(), lastFoundCount: passing.length });
-
-    const stamp = new Date().toLocaleTimeString();
-    console.log(`${stamp}  ${tag}: ${res.meta.count} scanned, ${passing.length} pass, ${added.length} new`);
-    for (const o of [...added].sort((a, b) => b.score - a.score)) {
-      console.log(`   🔔 ${o.title} — buy $${o.buy} → net $${o.net} (${Math.round(o.marginPct * 100)}%)  ${o.url}`);
+  let passingTotal = 0;
+  for (const query of queries) {
+    const tag = `[${wl.source}] "${query}"`;
+    try {
+      const res = await runScan({ query, source: wl.source, maxPrice: wl.maxPrice, thresholds: wl.thresholds });
+      const passing = res.opportunities.filter((o) => o.passes);
+      const added = passing.length ? await store.saveOpportunities(passing, { source: wl.source, query }) : [];
+      passingTotal += passing.length;
+      const stamp = new Date().toLocaleTimeString();
+      console.log(`${stamp}  ${tag}: ${res.meta.count} scanned, ${passing.length} pass, ${added.length} new`);
+      for (const o of [...added].sort((a, b) => b.score - a.score)) {
+        console.log(`   🔔 ${o.title} — buy $${o.buy} → net $${o.net} (${Math.round(o.marginPct * 100)}%)  ${o.url}`);
+      }
+      if (added.length) await notifyOpportunities({ source: wl.source, query }, added);
+    } catch (err: any) {
+      console.error(`${new Date().toLocaleTimeString()}  ${tag}: ERROR ${err?.message ?? err}`);
     }
-    if (added.length) await notifyOpportunities({ source: wl.source, query: wl.query }, added);
-  } catch (err: any) {
-    console.error(`${new Date().toLocaleTimeString()}  ${tag}: ERROR ${err?.message ?? err}`);
   }
+  await store.updateWatchlist(wl.id, { lastRunAt: new Date().toISOString(), lastFoundCount: passingTotal });
 }
 
 // Standalone entrypoint: run only when invoked directly (npm run watch), not
