@@ -44,6 +44,12 @@ test("throws a useful error on non-ok responses", async () => {
   await assert.rejects(() => new CraigslistConnector("sfbay").search({ query: "switch" }), /503/);
 });
 
+test("a 403 explains it's an IP block and names the fix (SCRAPER_PROXY)", async () => {
+  delete process.env.SCRAPER_PROXY;
+  globalThis.fetch = (async () => ({ ok: false, status: 403, text: async () => "" }) as any) as typeof fetch;
+  await assert.rejects(() => new CraigslistConnector("sfbay").search({ query: "switch" }), /IP blocked.*SCRAPER_PROXY/s);
+});
+
 test("enrichment pulls images (and missing prices) from the listing page", async () => {
   const PAGE = `<html><meta property="og:image" content="x">
     <img src="https://images.craigslist.org/abc123_def456_300x300.jpg">

@@ -29,6 +29,22 @@ export function proxyEnabledFor(source?: string): boolean {
   return only.split(",").map((s) => s.trim()).filter(Boolean).includes(source);
 }
 
+/**
+ * Turn a failed scrape response into an actionable error. A 403/429 from a
+ * marketplace almost always means the IP is blocked (datacenter/cloud IPs are
+ * routinely banned), so point at the fix — a residential/mobile SCRAPER_PROXY —
+ * instead of a cryptic status code.
+ */
+export function blockedHint(source: string, status: number, url?: string): string {
+  if (status === 403 || status === 429) {
+    const fix = proxyEnabledFor(source)
+      ? `a SCRAPER_PROXY is set but still blocked — use a residential/mobile proxy (datacenter proxies get 403'd too)`
+      : `${source} blocks datacenter/cloud IPs — set SCRAPER_PROXY=http://user:pass@host:port (residential/mobile) to route ${source} through it`;
+    return `${source} ${status} (IP blocked): ${fix}`;
+  }
+  return `${source} ${status}${url ? ` for ${url}` : ""}`;
+}
+
 let _dispatcher: ProxyAgent | undefined;
 function dispatcher(): ProxyAgent {
   return (_dispatcher ??= new ProxyAgent(proxyUrl()!));

@@ -1,7 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import type { SourceListing } from "../types.js";
 import type { SearchQuery, SourceConnector } from "./connector.js";
-import { scrapeFetch } from "../proxy.js";
+import { scrapeFetch, blockedHint } from "../proxy.js";
 
 /**
  * Craigslist source connector.
@@ -34,7 +34,7 @@ export class CraigslistConnector implements SourceConnector {
       { headers: { "User-Agent": "arbitrage-engine/0.1 (personal research)" } },
       "craigslist",
     );
-    if (!res.ok) throw new Error(`craigslist ${res.status} for ${url}`);
+    if (!res.ok) throw new Error(blockedHint("craigslist", res.status, url));
     const xml = await res.text();
 
     const doc = this.parser.parse(xml);
