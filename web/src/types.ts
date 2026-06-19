@@ -23,7 +23,7 @@ export interface Deal {
   notes?: string;
 }
 
-export type View = "ledger" | "hunt" | "realms" | "party" | "quests" | "classv" | "boss" | "hoard";
+export type View = "ledger" | "hunt" | "realms" | "party" | "quests" | "classv" | "boss" | "hoard" | "war";
 
 export type ClassId = "hunter" | "scrapper" | "merchant";
 
@@ -49,3 +49,8 @@ export interface SourceHealth {
   ready: boolean;
   note: string;
 }
+
+export interface Thresholds { minMarginPct: number; minAbsoluteProfit: number; minMatchConfidence: number; }
+export interface Settings { compSources?: string; defaultSource?: string; thresholds?: Thresholds; }
+export interface Watchlist { id: string; query: string; source: string; maxPrice?: number; intervalMin: number; enabled: boolean; lastRunAt?: string; lastFoundCount?: number; }
+export interface Sweep { id: string; label: string; keywords: string[]; source: string; intervalMin: number; perTick: number; enabled: boolean; totalFound?: number; lastKeyword?: string; }

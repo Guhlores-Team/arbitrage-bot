@@ -15,6 +15,7 @@ import ClassView from "./components/ClassView";
 import Party from "./components/Party";
 import Boss from "./components/Boss";
 import Hoard from "./components/Hoard";
+import WarTable from "./components/WarTable";
 import CoinBurst from "./components/CoinBurst";
 
 export interface Filters { q: string; source: string; stage: string; sort: "net" | "roi" | "conf" | "score"; }
@@ -131,6 +132,7 @@ export default function App() {
           {view === "classv" && <ClassView current={classId} onPick={(c) => void updateGame({ classId: c })} skills={skills} availableSP={availableSP} onUnlock={unlockSkill} />}
           {view === "boss" && <Boss boss={boss} bossMult={buffs.bossMult} />}
           {view === "hoard" && <Hoard owned={owned} equipped={equipped} onToggle={toggleRelic} />}
+          {view === "war" && <WarTable onToast={flash} />}
         </div>
       </main>
       {editing && <DealEditor deal={editing} onSave={saveEdit} onClose={() => setEditing(null)} />}

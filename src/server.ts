@@ -318,11 +318,11 @@ async function handleRunSweep(res: any, id: string) {
 }
 
 async function serveStatic(res: any, pathname: string) {
-  // Directory roots → their index.html: "/" → index.html, "/app" or "/app/" →
-  // the built React dashboard (web/ → public/app).
+  // The Loot Quest React app (web/ → public/app) is the dashboard, served at /
+  // and /app. The previous dashboard is kept at /classic.html as a fallback.
   let rel: string;
-  if (pathname === "/") rel = "index.html";
-  else if (pathname === "/app" || pathname === "/app/") rel = "app/index.html";
+  if (pathname === "/" || pathname === "/app" || pathname === "/app/") rel = "app/index.html";
+  else if (pathname === "/classic" || pathname === "/classic/") rel = "classic.html";
   else rel = pathname.replace(/^\/+/, "");
   const filePath = join(PUBLIC_DIR, rel);
   if (!filePath.startsWith(PUBLIC_DIR)) return json(res, 403, { error: "forbidden" }); // no traversal

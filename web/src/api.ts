@@ -1,4 +1,4 @@
-import type { Deal, Game, OutcomePatch, SourceHealth } from "./types";
+import type { Deal, Game, OutcomePatch, SourceHealth, Settings, Watchlist, Sweep } from "./types";
 
 // The dashboard is served from /app but the API lives at the server root.
 const API = "";
@@ -58,3 +58,28 @@ export async function runScan(query: string, source: string, onStatus?: (s: stri
     }, 2500);
   });
 }
+
+// --- control panel (settings / watchlists / sweeps / alerts) ---
+const jget = async (p: string) => { try { return await (await fetch(API + p)).json(); } catch { return {}; } };
+const jsend = (p: string, method: string, body?: unknown) =>
+  fetch(API + p, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.json().catch(() => ({})));
+
+export async function fetchSettings(): Promise<{ settings: Settings; sources: string[] }> {
+  const j = await jget("/api/settings");
+  return { settings: j.settings ?? {}, sources: j.sources ?? [] };
+}
+export const saveSettings = (body: Settings) => jsend("/api/settings", "PUT", body);
+
+export async function fetchWatchlists(): Promise<Watchlist[]> { return (await jget("/api/watchlists")).watchlists ?? []; }
+export const createWatchlist = (b: Partial<Watchlist> & { thresholds?: unknown }) => jsend("/api/watchlists", "POST", b);
+export const toggleWatchlist = (id: string, enabled: boolean) => jsend(`/api/watchlists/${id}`, "PATCH", { enabled });
+export const deleteWatchlist = (id: string) => fetch(`${API}/api/watchlists/${id}`, { method: "DELETE" });
+export const runWatchlist = (id: string) => jsend(`/api/watchlists/${id}/run`, "POST");
+
+export async function fetchSweeps(): Promise<Sweep[]> { return (await jget("/api/sweeps")).sweeps ?? []; }
+export const createSweep = (b: Partial<Sweep>) => jsend("/api/sweeps", "POST", b);
+export const toggleSweep = (id: string, enabled: boolean) => jsend(`/api/sweeps/${id}`, "PATCH", { enabled });
+export const deleteSweep = (id: string) => fetch(`${API}/api/sweeps/${id}`, { method: "DELETE" });
+export const runSweep = (id: string) => jsend(`/api/sweeps/${id}/run`, "POST");
+
+export const testAlert = () => jsend("/api/notify/test", "POST");

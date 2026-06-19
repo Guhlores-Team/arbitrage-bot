@@ -16,6 +16,7 @@ const NAV: { icon: string; label: string; view?: View }[] = [
   { icon: "armor-vest", label: "Class & Skills", view: "classv" },
   { icon: "dragon-head", label: "Boss Raid", view: "boss" },
   { icon: "anvil", label: "The Hoard", view: "hoard" },
+  { icon: "arrow-cluster", label: "War Table", view: "war" },
 ];
 
 export default function Sidebar({
