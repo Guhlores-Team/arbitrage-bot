@@ -23,11 +23,27 @@ export interface Deal {
   notes?: string;
 }
 
-export type View = "ledger" | "hunt";
+export type View = "ledger" | "hunt" | "realms" | "party" | "quests" | "classv";
+
+export type ClassId = "hunter" | "scrapper" | "merchant";
+
+export interface Game {
+  name?: string;
+  classId?: ClassId;
+  claimedQuests?: string[];
+  bonusXp?: number;
+  lastSeenLevel?: number;
+}
 
 export interface OutcomePatch {
   status?: Stage;
   boughtPrice?: number;
   soldPrice?: number;
   notes?: string;
+}
+
+export interface SourceHealth {
+  source: string;
+  ready: boolean;
+  note: string;
 }

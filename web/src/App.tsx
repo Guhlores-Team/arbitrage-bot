@@ -1,54 +1,71 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Deal, OutcomePatch, Stage, View } from "./types";
-import { fetchDeals, patchDeal, runScan } from "./api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Deal, Game, OutcomePatch, Stage, View, SourceHealth, ClassId } from "./types";
+import { fetchDeals, patchDeal, runScan, fetchGame, saveGame, fetchHealth } from "./api";
 import { dealNet, dealRoi, conf } from "./lib";
+import { computeHero, computeQuests } from "./progression";
+import { isMuted, toggleMute, sfxLoot, sfxAdvance, sfxLevel } from "./sound";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import Ledger from "./components/Ledger";
 import Hunt from "./components/Hunt";
 import DealEditor from "./components/DealEditor";
+import Realms from "./components/Realms";
+import Quests from "./components/Quests";
+import ClassView from "./components/ClassView";
+import Party from "./components/Party";
+import CoinBurst from "./components/CoinBurst";
 
 export interface Filters {
-  q: string;
-  source: string;
-  stage: string;
-  sort: "net" | "roi" | "conf" | "score";
+  q: string; source: string; stage: string; sort: "net" | "roi" | "conf" | "score";
 }
 
 export default function App() {
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [game, setGame] = useState<Game>({});
+  const [health, setHealth] = useState<SourceHealth[]>([]);
   const [view, setView] = useState<View>(() => (localStorage.getItem("lq_view") as View) || "ledger");
   const [editing, setEditing] = useState<Deal | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [burst, setBurst] = useState(0);
+  const [muted, setMuted] = useState(isMuted());
   const [filters, setFilters] = useState<Filters>({ q: "", source: "", stage: "", sort: "net" });
 
   const load = useCallback(async () => setDeals(await fetchDeals()), []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    void fetchGame().then(setGame);
+    void fetchHealth().then(setHealth);
+  }, [load]);
 
-  const flash = useCallback((m: string) => {
-    setToast(m);
-    setTimeout(() => setToast(null), 2600);
-  }, []);
+  const flash = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(null), 2600); }, []);
+  const switchView = useCallback((v: View) => { setView(v); localStorage.setItem("lq_view", v); }, []);
+  const updateGame = useCallback(async (patch: Game) => { setGame((g) => ({ ...g, ...patch })); await saveGame(patch); }, []);
 
-  const switchView = useCallback((v: View) => {
-    setView(v);
-    localStorage.setItem("lq_view", v);
-  }, []);
+  const classId: ClassId = game.classId ?? "hunter";
+  const hero = useMemo(() => computeHero(deals, classId, game.bonusXp ?? 0), [deals, classId, game.bonusXp]);
+  const quests = useMemo(() => computeQuests(deals, game.claimedQuests ?? []), [deals, game.claimedQuests]);
 
-  const sources = useMemo(
-    () => [...new Set(deals.map((d) => d.source).filter(Boolean))].sort() as string[],
-    [deals],
-  );
+  // Level-up detection across renders/sessions.
+  const initLevel = useRef(false);
+  useEffect(() => {
+    if (game.lastSeenLevel == null) {
+      if (!initLevel.current && deals.length >= 0) { initLevel.current = true; void updateGame({ lastSeenLevel: hero.level }); }
+      return;
+    }
+    if (hero.level > game.lastSeenLevel) {
+      flash(`🆙 LEVEL ${hero.level}! +1 skill point`);
+      if (!muted) sfxLevel();
+      void updateGame({ lastSeenLevel: hero.level });
+    }
+  }, [hero.level, game.lastSeenLevel, deals.length, updateGame, flash, muted]);
+
+  const sources = useMemo(() => [...new Set(deals.map((d) => d.source).filter(Boolean))].sort() as string[], [deals]);
 
   const filtered = useMemo(() => {
     const q = filters.q.toLowerCase();
     const key = { net: dealNet, roi: dealRoi, conf, score: (d: Deal) => d.score ?? 0 }[filters.sort];
     return deals
-      .filter((d) =>
-        (!q || d.title.toLowerCase().includes(q)) &&
-        (!filters.source || d.source === filters.source) &&
-        (!filters.stage || (d.status ?? "new") === filters.stage),
-      )
+      .filter((d) => (!q || d.title.toLowerCase().includes(q)) && (!filters.source || d.source === filters.source) && (!filters.stage || (d.status ?? "new") === filters.stage))
       .sort((a, b) => key(b) - key(a));
   }, [deals, filters]);
 
@@ -59,17 +76,17 @@ export default function App() {
     if (to === "bought" && d.boughtPrice == null) patch.boughtPrice = d.buy;
     if (to === "sold" && d.soldPrice == null) patch.soldPrice = d.resale;
     await patchDeal(id, patch);
-    flash(to === "sold" ? "💰 Looted!" : "⚔ Advanced");
+    if (to === "sold") { setBurst((b) => b + 1); if (!muted) sfxLoot(); flash(`💰 Looted ${d.title.slice(0, 22)}`); }
+    else { if (!muted) sfxAdvance(); flash("⚔ Advanced"); }
     await load();
-  }, [deals, flash, load]);
+  }, [deals, flash, load, muted]);
 
   const saveEdit = useCallback(async (patch: OutcomePatch) => {
     if (!editing) return;
+    if (patch.status === "sold" && editing.status !== "sold") { setBurst((b) => b + 1); if (!muted) sfxLoot(); }
     await patchDeal(editing.id, patch);
-    setEditing(null);
-    flash("Saved");
-    await load();
-  }, [editing, flash, load]);
+    setEditing(null); flash("Saved"); await load();
+  }, [editing, flash, load, muted]);
 
   const scan = useCallback(async () => {
     const query = prompt("Explore — search query?", "nintendo switch");
@@ -80,28 +97,39 @@ export default function App() {
     await load();
   }, [flash, load]);
 
+  const claimQuest = useCallback(async (id: string, reward: number) => {
+    await updateGame({ claimedQuests: [...(game.claimedQuests ?? []), id], bonusXp: (game.bonusXp ?? 0) + reward });
+    flash(`✨ Quest claimed · +${reward} XP`);
+  }, [game.claimedQuests, game.bonusXp, updateGame, flash]);
+
+  const pickRealm = useCallback((source: string) => {
+    setFilters((f) => ({ ...f, source }));
+    switchView("hunt");
+  }, [switchView]);
+
+  const onMute = useCallback(() => setMuted(toggleMute()), []);
+
   return (
     <div className="root">
-      <Sidebar deals={deals} view={view} onView={switchView} />
+      <Sidebar hero={hero} game={game} view={view} onView={switchView}
+        onRename={() => { const n = prompt("Hero name?", game.name || "Operator"); if (n) void updateGame({ name: n }); }} />
       <main className="main">
-        <TopBar view={view} onView={switchView} onScan={scan} onReload={load} />
+        <TopBar view={view} onView={switchView} onScan={scan} onReload={load} muted={muted} onMute={onMute} />
         <div className="content">
-          {view === "ledger" ? (
-            <Ledger
-              deals={deals}
-              filtered={filtered}
-              filters={filters}
-              setFilters={setFilters}
-              sources={sources}
-              onAdvance={advance}
-              onEdit={setEditing}
-            />
-          ) : (
-            <Hunt deals={filtered.filter((d) => (d.status ?? "new") !== "skipped")} onAdvance={advance} onEdit={setEditing} />
+          {view === "ledger" && (
+            <Ledger deals={deals} filtered={filtered} filters={filters} setFilters={setFilters} sources={sources} onAdvance={advance} onEdit={setEditing} />
           )}
+          {view === "hunt" && (
+            <Hunt deals={filtered.filter((d) => (d.status ?? "new") !== "skipped")} onAdvance={advance} onEdit={setEditing} realm={filters.source} onClearRealm={() => setFilters((f) => ({ ...f, source: "" }))} />
+          )}
+          {view === "party" && <Party deals={deals} onAdvance={advance} onEdit={setEditing} />}
+          {view === "realms" && <Realms health={health} sources={sources} active={filters.source} onPick={pickRealm} />}
+          {view === "quests" && <Quests quests={quests} onClaim={claimQuest} />}
+          {view === "classv" && <ClassView current={classId} onPick={(c) => void updateGame({ classId: c })} hero={hero} />}
         </div>
       </main>
       {editing && <DealEditor deal={editing} onSave={saveEdit} onClose={() => setEditing(null)} />}
+      <CoinBurst trigger={burst} />
       {toast && <div className="toast">{toast}</div>}
     </div>
   );

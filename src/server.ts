@@ -95,6 +95,20 @@ const server = createServer(async (req, res) => {
       }
     }
 
+    if (path === "/api/game") {
+      if (method === "GET") return json(res, 200, { game: await store.getGame() });
+      if (method === "PUT" || method === "POST" || method === "PATCH") {
+        const body = await readBody(req);
+        const patch: any = {};
+        if (typeof body?.name === "string") patch.name = body.name.slice(0, 40);
+        if (["hunter", "scrapper", "merchant"].includes(body?.classId)) patch.classId = body.classId;
+        if (Array.isArray(body?.claimedQuests)) patch.claimedQuests = body.claimedQuests.map(String).slice(0, 200);
+        if (body?.bonusXp != null) patch.bonusXp = Math.max(0, Number(body.bonusXp));
+        if (body?.lastSeenLevel != null) patch.lastSeenLevel = Number(body.lastSeenLevel);
+        return json(res, 200, { game: await store.setGame(patch) });
+      }
+    }
+
     if (method === "POST" && path === "/api/notify/test") {
       const status = notifierStatus();
       if (!status.any) return json(res, 200, { sent: 0, status });

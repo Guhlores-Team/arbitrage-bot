@@ -58,17 +58,31 @@ export interface Settings {
   seededDiscovery?: boolean;
 }
 
+/**
+ * Cosmetic/game progression state that can't be derived from deals (the level,
+ * gold, XP etc. ARE derived from the deals on the client). Only the player's
+ * choices + claim records live here.
+ */
+export interface GameState {
+  name?: string;
+  classId?: "hunter" | "scrapper" | "merchant";
+  claimedQuests?: string[]; // date-stamped quest ids the player has claimed
+  bonusXp?: number; // XP granted by claimed quests (added on top of deal-derived XP)
+  lastSeenLevel?: number; // for "level up" detection across sessions
+}
+
 interface StoreData {
   opportunities: OpportunityView[];
   watchlists: Watchlist[];
   sweeps: Sweep[];
   settings: Settings;
+  game: GameState;
 }
 
 const MAX_OPPORTUNITIES = 1000;
 
 export class JsonStore {
-  private data: StoreData = { opportunities: [], watchlists: [], sweeps: [], settings: {} };
+  private data: StoreData = { opportunities: [], watchlists: [], sweeps: [], settings: {}, game: {} };
   private loaded = false;
 
   constructor(private file = process.env.STORE_FILE ?? join("data", "store.json")) {}
@@ -83,9 +97,10 @@ export class JsonStore {
         watchlists: Array.isArray(parsed.watchlists) ? parsed.watchlists : [],
         sweeps: Array.isArray(parsed.sweeps) ? parsed.sweeps : [],
         settings: parsed.settings && typeof parsed.settings === "object" ? parsed.settings : {},
+        game: parsed.game && typeof parsed.game === "object" ? parsed.game : {},
       };
     } catch {
-      this.data = { opportunities: [], watchlists: [], sweeps: [], settings: {} }; // fresh store
+      this.data = { opportunities: [], watchlists: [], sweeps: [], settings: {}, game: {} }; // fresh store
     }
     this.loaded = true;
   }
@@ -203,6 +218,20 @@ export class JsonStore {
     this.data.settings = { ...this.data.settings, ...patch };
     await this.flush();
     return { ...this.data.settings };
+  }
+
+  // --- game (cosmetic progression state; level/gold/xp are derived from deals) ---
+
+  async getGame(): Promise<GameState> {
+    await this.load();
+    return { ...this.data.game };
+  }
+
+  async setGame(patch: Partial<GameState>): Promise<GameState> {
+    await this.load();
+    this.data.game = { ...this.data.game, ...patch };
+    await this.flush();
+    return { ...this.data.game };
   }
 
   // --- watchlists (scheduled scans) ---

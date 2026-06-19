@@ -1,7 +1,23 @@
-import type { Deal, OutcomePatch } from "./types";
+import type { Deal, Game, OutcomePatch, SourceHealth } from "./types";
 
 // The dashboard is served from /app but the API lives at the server root.
 const API = "";
+
+export async function fetchGame(): Promise<Game> {
+  try { return (await (await fetch(`${API}/api/game`)).json()).game ?? {}; } catch { return {}; }
+}
+
+export async function saveGame(patch: Game): Promise<Game> {
+  try {
+    return (await (await fetch(`${API}/api/game`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
+    })).json()).game ?? {};
+  } catch { return patch; }
+}
+
+export async function fetchHealth(): Promise<SourceHealth[]> {
+  try { return (await (await fetch(`${API}/api/health`)).json()).sources ?? []; } catch { return []; }
+}
 
 export async function fetchDeals(): Promise<Deal[]> {
   try {

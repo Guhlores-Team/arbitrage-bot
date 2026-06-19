@@ -108,3 +108,13 @@ td.mono { font-family: 'DM Mono', monospace; }
   .kpis { grid-template-columns: 1fr 1fr; } .board { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 540px) { .kpis, .board { grid-template-columns: 1fr; } .content, .topbar { padding-left: 16px; padding-right: 16px; } }
+
+/* coin-burst on loot */
+.coinlayer { position: fixed; left: 50%; top: 52%; pointer-events: none; z-index: 70; }
+.coin { position: absolute; width: 26px; height: 26px; background: url(/art/tw/coin.svg) center/contain no-repeat; animation: coinfly .95s cubic-bezier(.2,.6,.3,1) forwards; }
+@keyframes coinfly {
+  0% { transform: translate(0,0) scale(.4) rotate(0); opacity: 0; }
+  12% { opacity: 1; }
+  45% { transform: translate(calc(var(--dx) * .6), var(--dy)) scale(1.05) rotate(180deg); opacity: 1; }
+  100% { transform: translate(var(--dx), 130px) scale(.7) rotate(420deg); opacity: 0; }
+}
