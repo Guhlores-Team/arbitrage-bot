@@ -9,7 +9,7 @@
     "run": "tsx src/run.ts",
     "fb:login": "tsx src/fb-login.ts",
     "fb:import": "tsx src/fb-import.ts",
-    "dashboard": "tsx src/server.ts",
+    "dashboard": "WATCH_IN_SERVER=false tsx src/server.ts",
     "serve": "WATCH_IN_SERVER=true tsx src/server.ts",
     "watch": "tsx src/watch.ts",
     "doctor": "tsx src/doctor.ts",

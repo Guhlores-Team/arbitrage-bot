@@ -98,18 +98,22 @@ export async function startWatch(): Promise<void> {
  * one-time settings flag, so deleting the sweep in the UI makes it stay gone.
  */
 async function seedDefaultSweep(): Promise<void> {
+  if ((process.env.SEED_DISCOVERY ?? "true") === "false") return; // opt out of seeding entirely
   const settings = await store.getSettings();
   if (settings.seededDiscovery) return;
   const existing = await store.listSweeps();
   if (existing.length === 0) {
+    // Seeded DISABLED: a broad all-sources sweep can burn SerpApi quota fast, so
+    // it never runs until you review it and turn it on in the dashboard.
     await store.addSweep({
       label: "Auto-discovery",
       keywords: STARTER_KEYWORDS,
       source: "all",
       intervalMin: 30,
-      perTick: 3,
+      perTick: 1,
+      enabled: false,
     });
-    console.log(`  Seeded default Auto-discovery sweep (${STARTER_KEYWORDS.length} categories, all sources).`);
+    console.log(`  Seeded a DISABLED "Auto-discovery" sweep (${STARTER_KEYWORDS.length} categories). Enable it in the dashboard when ready.`);
   }
   await store.setSettings({ seededDiscovery: true });
 }
