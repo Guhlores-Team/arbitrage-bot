@@ -12,7 +12,7 @@ export default function Hoard({
   return (
     <>
       <div style={{ marginBottom: 14, font: "13px 'Hanken Grotesk'", color: "var(--muted2)" }}>
-        Relics drop from <b>Epic+ flips (net ≥ $100... well, $75)</b>. Equip up to <b style={{ color: "var(--gold)" }}>{RELIC_SLOTS}</b> for passive edges.
+        Relics drop from <b>big flips (net ≥ $75)</b>. Equip up to <b style={{ color: "var(--gold)" }}>{RELIC_SLOTS}</b> for passive edges.
         Slots used: <b>{equipped.length}/{RELIC_SLOTS}</b>
       </div>
       <div className="qgrid">
