@@ -3,6 +3,7 @@ import { store, type Watchlist, type Sweep } from "./store.js";
 import { runScan } from "./scan.js";
 import { notifyOpportunities, notifierStatus } from "./notify.js";
 import { pickSweepBatch, STARTER_KEYWORDS } from "./sweep.js";
+import { resetSerpApiSearchCount } from "./connectors/serpapi.js";
 
 /**
  * Watch runner: periodically runs each enabled watchlist, saves passing
@@ -46,6 +47,7 @@ async function tick(): Promise<void> {
 async function runSweep(sw: Sweep): Promise<void> {
   const { batch, nextCursor } = pickSweepBatch(sw.keywords, sw.cursor, sw.perTick);
   if (!batch.length) return;
+  resetSerpApiSearchCount(); // per-tick SerpApi budget + fresh monthly read
   let found = 0;
   for (const query of batch) {
     const tag = `[sweep:${sw.label}] "${query}"`;
@@ -114,6 +116,7 @@ async function seedDefaultSweep(): Promise<void> {
 
 async function runOne(wl: Watchlist): Promise<void> {
   const tag = `[${wl.source}] "${wl.query}"`;
+  resetSerpApiSearchCount(); // per-tick SerpApi budget + fresh monthly read
   try {
     const res = await runScan({
       query: wl.query,

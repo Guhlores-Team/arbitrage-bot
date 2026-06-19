@@ -6,15 +6,32 @@ import { log } from "../log.js";
 let liveSearches = 0;
 // Budget state: undefined = not yet checked, null = unknown (don't guard).
 let budget: { left: number } | null | undefined;
+let warnedBudget = false; // warn once per run, not once per skipped listing
 
 /** Searches this process has spent — surfaced by the debug console / doctor. */
 export function serpApiSearchCount(): number {
   return liveSearches;
 }
-/** Reset the per-run counter + budget state (tests, or a fresh scan session). */
+/**
+ * Reset the per-run counter + budget state. Call this at the start of each scan
+ * run (the watch runner does, per tick) so SERPAPI_MAX_PER_RUN is a per-run cap
+ * and the monthly figure is re-read fresh each time — a long-running server then
+ * never permanently locks itself out after one cap hit.
+ */
 export function resetSerpApiSearchCount(): void {
   liveSearches = 0;
   budget = undefined;
+  warnedBudget = false;
+}
+
+/** Log the quota-skip once per run instead of once per skipped listing (spam). */
+function noteBudgetSkip(): void {
+  if (warnedBudget) return;
+  warnedBudget = true;
+  log.warn("serpapi: quota guard — comps paused for this run (near monthly cap or SERPAPI_MAX_PER_RUN)", {
+    left: budget?.left ?? null,
+    spent: liveSearches,
+  });
 }
 
 /**
@@ -117,7 +134,7 @@ export class SerpApiShoppingConnector implements CompConnector {
       params.set("LH_Complete", "1");
     }
     if (await budgetExhausted(this.key)) {
-      log.warn("serpapi: quota guard — skipping live search", { left: budget?.left ?? null, spent: liveSearches });
+      noteBudgetSkip();
       return [];
     }
     liveSearches++;
@@ -144,7 +161,7 @@ export class SerpApiShoppingConnector implements CompConnector {
       "https://serpapi.com/search.json?" +
       new URLSearchParams({ engine: "google_shopping", q: searchString, api_key: this.key, num: String(Math.min(limit, 40)) });
     if (await budgetExhausted(this.key)) {
-      log.warn("serpapi: quota guard — skipping live search", { left: budget?.left ?? null, spent: liveSearches });
+      noteBudgetSkip();
       return [];
     }
     liveSearches++;
