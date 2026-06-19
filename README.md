@@ -112,6 +112,23 @@ command (`npm run watch`, `npm run serve`) for the same per-listing logging.
 | `SERPAPI_MIN_RESERVE` | `0` | keep this many monthly SerpApi searches in reserve — once near the cap, scans return no comps instead of erroring |
 | `SERPAPI_MAX_PER_RUN` | `0` (off) | hard cap on SerpApi searches per process — a safety belt against a runaway scan burning the month |
 
+### Calibrate your thresholds
+
+```bash
+npm run calibrate                                       # default watchlist, demo source
+npm run calibrate -- "nintendo switch,airpods pro" offerup 300
+```
+
+Runs real scans across the given queries and reports the **distribution** of
+every scored candidate's margin %, net profit, match confidence, and comp count,
+a **pass-count grid** (how many deals survive at each margin/profit threshold),
+and a **recommended** `MIN_MARGIN_PCT` / `MIN_ABSOLUTE_PROFIT` /
+`MIN_MATCH_CONFIDENCE` set ready to paste into `.env`. Use it to tell whether a
+quiet scan means your thresholds are too strict or the source simply has no deals
+right now. Reuses one comp cache across queries, so it's quota-cheap. Args:
+`[queries (comma-separated)] [source] [hardPriceCap]`; `CALIBRATE_LIMIT` (default
+12) sets listings pulled per query.
+
 ## Deploy on a VM (always-on, one process)
 
 For a small VM (≈2 vCPU / 4 GB, e.g. an `e2-medium`) running alongside other
