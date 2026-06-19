@@ -36,6 +36,10 @@ export class RoutingCompConnector implements CompConnector {
   constructor(
     private baseline: CompConnector,
     private make: (market: string) => CompConnector | null,
+    // "replace": when a live specialized market covers the item, use it INSTEAD
+    // of the baseline (saves the baseline's quota — best on a SerpApi free tier).
+    // "blend": query both for maximum comp breadth.
+    private mode: "replace" | "blend" = "replace",
   ) {}
 
   get basis(): "sold" | "ask" | "mock" {
@@ -43,15 +47,21 @@ export class RoutingCompConnector implements CompConnector {
   }
 
   async getSoldComps(searchString: string, limit = 20): Promise<SoldComp[]> {
-    const conns: CompConnector[] = [this.baseline];
+    // A specialized market counts only when it has real data — a mock/keyless
+    // market must never replace or pollute a live baseline valuation. (When the
+    // baseline is also mock, e.g. demo mode, allow it for coherence.)
     const m = routeMarket(searchString);
-    if (m) {
-      const c = this.make(m);
-      // Only blend the specialized market when it has real data — a mock/keyless
-      // market must never pollute a live eBay valuation. (When the baseline is
-      // also mock, e.g. demo mode, allow it for coherence.)
-      if (c && (c.basis !== "mock" || this.baseline.basis === "mock")) conns.push(c);
-    }
+    const specialized = m ? this.make(m) : null;
+    const liveSpecialized =
+      specialized && (specialized.basis !== "mock" || this.baseline.basis === "mock") ? specialized : null;
+
+    const conns: CompConnector[] =
+      liveSpecialized && this.mode === "replace"
+        ? [liveSpecialized] // covered by a specialized source → skip the baseline
+        : liveSpecialized
+          ? [this.baseline, liveSpecialized]
+          : [this.baseline];
+
     const per = Math.max(5, Math.ceil(limit / conns.length));
     const pool: SoldComp[] = [];
     for (const c of conns) {

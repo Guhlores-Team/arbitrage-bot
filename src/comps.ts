@@ -6,6 +6,7 @@ import { SerpApiShoppingConnector } from "./connectors/serpapi.js";
 import { ApifyCompConnector, parseApifyComps } from "./connectors/apify-comp.js";
 import { MultiCompConnector } from "./connectors/multicomp.js";
 import { RoutingCompConnector } from "./connectors/routing.js";
+import { CachingCompConnector } from "./connectors/cache.js";
 import { effectiveCompSources } from "./settings.js";
 import type { CompConnector } from "./connectors/connector.js";
 
@@ -43,11 +44,27 @@ function makeComp(name: string): CompConnector | null {
 }
 
 /**
- * Build the comp connector from COMP_SOURCES (default "ebay"):
- *   - "auto"            → category routing (eBay baseline + the best specialized
- *                         market per item: games→PriceCharting, sneakers→StockX)
- *   - "ebay,pricecharting,…" → blend the listed markets equally
+ * The general-purpose baseline comp market: SerpApi (eBay sold, ungated) when a
+ * key is present, else the eBay API connector. Used for un-routed items and as
+ * the `auto` baseline — so routing never falls back to mock when SerpApi is live.
+ */
+function defaultBaseline(): CompConnector {
+  return process.env.SERPAPI_KEY ? new SerpApiShoppingConnector() : new EbayCompConnector();
+}
+
+/**
+ * Build the comp connector from COMP_SOURCES (default: SerpApi if keyed, else
+ * eBay):
+ *   - "auto"            → category routing: the best specialized market per item
+ *                         (games→PriceCharting, sneakers→StockX) over a SerpApi
+ *                         baseline. COMP_ROUTING=replace (default) uses the
+ *                         specialized market instead of the baseline to save
+ *                         quota; =blend queries both.
+ *   - "serpapi,pricecharting,…" → blend the listed markets equally
  *   - single name       → just that market
+ *
+ * Wrapped in a TTL cache (COMP_CACHE_TTL_MIN, default 720) so duplicate lookups
+ * don't spend repeat searches.
  */
 export function buildComper(): CompConnector {
   const names = effectiveCompSources()
@@ -55,13 +72,17 @@ export function buildComper(): CompConnector {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  let comper: CompConnector;
   if (names.includes("auto")) {
-    return new RoutingCompConnector(new EbayCompConnector(), makeComp);
+    const mode = process.env.COMP_ROUTING === "blend" ? "blend" : "replace";
+    comper = new RoutingCompConnector(defaultBaseline(), makeComp, mode);
+  } else {
+    const comps = names.map(makeComp).filter((c): c is CompConnector => Boolean(c));
+    comper = comps.length === 0 ? defaultBaseline() : comps.length === 1 ? comps[0] : new MultiCompConnector(comps);
   }
 
-  const comps = names.map(makeComp).filter((c): c is CompConnector => Boolean(c));
-  if (comps.length === 0) return new EbayCompConnector();
-  return comps.length === 1 ? comps[0] : new MultiCompConnector(comps);
+  const ttlMin = Number(process.env.COMP_CACHE_TTL_MIN ?? 720);
+  return ttlMin > 0 ? new CachingCompConnector(comper, ttlMin * 60_000) : comper;
 }
 
 /** Human-readable description of the active comp market(s), for health/UI. */

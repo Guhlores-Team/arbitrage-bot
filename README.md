@@ -258,10 +258,22 @@ live. Browse asks are a rougher comp than solds, but free and ungated.
 triangulates across markets. PriceCharting (games/consoles/cards) needs
 `PRICECHARTING_TOKEN`; Keepa (Amazon) needs `KEEPA_API_KEY`; both mock without.
 
-**Category routing:** `COMP_SOURCES=auto` values each item against eBay plus the
-best specialized market for its category — games/cards → PriceCharting, sneakers
-→ StockX — and only blends a specialized market when it has real data (a keyless
-market never pollutes live eBay comps).
+**Category routing:** `COMP_SOURCES=auto` routes each item to the best
+specialized market for its category — games/cards → PriceCharting, sneakers →
+StockX — over a general baseline (**SerpApi** when `SERPAPI_KEY` is set, else the
+eBay connector). A keyless/mock specialized market never replaces or pollutes
+live comps. `COMP_ROUTING` controls how a covered item uses the baseline:
+
+| value | behavior |
+|-------|----------|
+| `replace` (default) | use the specialized market **instead of** the baseline — spends 0 baseline searches on covered items (best on a SerpApi free tier) |
+| `blend` | query the baseline **and** the specialized market for maximum comp breadth |
+
+**Comp caching:** every comper is wrapped in a TTL cache keyed by the search
+string, so duplicate lookups (same product across listings, or re-scans) don't
+spend a repeat search — the main lever for staying under SerpApi's free cap.
+Default 12h; set `COMP_CACHE_TTL_MIN` (0 disables). `npm run debug` shows the
+gap between comp lookups and actual SerpApi searches.
 
 **Scanning everywhere:** pass `--source=all` (CLI) or pick "all sources" in the
 dashboard / watchlists / sweeps to hit Craigslist + Facebook + OfferUp + Mercari
