@@ -171,6 +171,11 @@ export async function runPipelineDetailed(
     if (comper.basis === "mock") flags.push("mock comps — not real resale data");
     if (margin.conditionDiscount > 0) flags.push(`condition discount −$${margin.conditionDiscount} vs comps`);
     if (margin.spread > 0.6) flags.push("wide price spread — resale uncertain");
+    // Lot/bundle guard: a single listing of many items is comped per-ITEM, so the
+    // auto-margin is misleading (e.g. "$5 — 20 games" isn't a $5 item). Flag it so
+    // the operator values it as qty × comp, not as one unit.
+    const lot = detectLot(listing.rawTitle);
+    if (lot.isLot) flags.push(`LOT${lot.qty ? ` ×${lot.qty}` : ""} — comps are per-item; value ≈ qty × comp`);
 
     stats.scored++;
     if (passes) stats.passed++;
@@ -224,6 +229,27 @@ function median(xs: number[]): number {
 }
 function avg(xs: number[]): number {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+}
+
+/**
+ * Detect a multi-item lot/bundle and best-effort the quantity. Conservative on
+ * quantity so model numbers ("Xbox 360", "PS3") aren't mistaken for counts: only
+ * explicit lot/bundle counts, "(N)", "xN", or a LEADING count + a unit word.
+ */
+export function detectLot(title: string): { isLot: boolean; qty?: number } {
+  const t = title.toLowerCase();
+  const keyword = /\b(lot|bundle|bulk|wholesale|job\s?lot)\b/.test(t);
+  const UNIT = /\b(games?|cards?|items?|pcs|pieces?|books?|figures?|comics?|movies?|dvds?|cds?|records?|vinyls?)\b/;
+  let qty: number | undefined;
+  const explicit =
+    t.match(/\b(?:lot|bundle|set)\s+(?:of\s+)?(\d{1,3})\b/) ||
+    t.match(/\((\d{1,3})\)/) ||
+    t.match(/\bx\s?(\d{1,3})\b/);
+  const leading = t.match(/^\s*(\d{1,3})\s+[a-z]/);
+  if (explicit) qty = Number(explicit[1]);
+  else if (leading && UNIT.test(t) && Number(leading[1]) >= 3) qty = Number(leading[1]);
+  const isLot = keyword || qty != null;
+  return { isLot, qty: isLot ? qty : undefined };
 }
 
 /** Group matched comps by sell market with a count + median price each. */

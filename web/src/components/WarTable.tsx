@@ -77,7 +77,7 @@ export default function WarTable({ onToast }: { onToast: (m: string) => void }) 
           setWl({ ...wl, query: "" }); onToast("Watchlist added"); reload();
         }}>Add</button>
       </div>
-      <table style={{ marginBottom: 6 }}>
+      <div className="table-wrap"><table style={{ marginBottom: 6 }}>
         <thead><tr><th>Query</th><th>Source</th><th>Every</th><th>Last</th><th>On</th><th></th><th></th></tr></thead>
         <tbody>
           {wls.length === 0 && <tr><td colSpan={7} style={{ color: "var(--muted)" }}>none</td></tr>}
@@ -91,7 +91,7 @@ export default function WarTable({ onToast }: { onToast: (m: string) => void }) 
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
 
       {/* SWEEPS */}
       <h2 style={{ font: "700 15px 'Cinzel'", margin: "22px 0 10px" }}>Sweeps (round-robin keyword hunts)</h2>
@@ -108,7 +108,7 @@ export default function WarTable({ onToast }: { onToast: (m: string) => void }) 
           setSw({ ...sw, label: "", keywords: "" }); onToast("Sweep added"); reload();
         }}>Add</button>
       </div>
-      <table>
+      <div className="table-wrap"><table>
         <thead><tr><th>Label</th><th>Keywords</th><th>Source</th><th>Every</th><th>Found</th><th>On</th><th></th><th></th></tr></thead>
         <tbody>
           {sweeps.length === 0 && <tr><td colSpan={8} style={{ color: "var(--muted)" }}>none</td></tr>}
@@ -123,7 +123,7 @@ export default function WarTable({ onToast }: { onToast: (m: string) => void }) 
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </div>
   );
 }

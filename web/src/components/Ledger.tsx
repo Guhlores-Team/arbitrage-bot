@@ -1,6 +1,7 @@
 import type { Filters } from "../App";
 import type { Deal, Stage } from "../types";
-import { STAGES, NEXT, dealNet, dealRoi, conf, money } from "../lib";
+import { lotFlag } from "../types";
+import { STAGES, NEXT, dealNet, dealRoi, conf, money, median } from "../lib";
 
 function Kpis({ deals }: { deals: Deal[] }) {
   const open = deals.filter((d) => d.status === "new" || d.status === "bought" || d.status == null);
@@ -8,7 +9,7 @@ function Kpis({ deals }: { deals: Deal[] }) {
   const realized = sold.reduce((a, d) => a + dealNet(d), 0);
   const projected = open.reduce((a, d) => a + dealNet(d), 0);
   const capital = deals.filter((d) => d.status === "bought").reduce((a, d) => a + (d.boughtPrice ?? d.buy ?? 0), 0);
-  const avgRoi = open.length ? open.reduce((a, d) => a + dealRoi(d), 0) / open.length : 0;
+  const medRoi = median(open.map(dealRoi)); // median ROI — robust to tiny-buy outliers
   const winRate = sold.length ? sold.filter((d) => dealNet(d) > 0).length / sold.length : 0;
   const card = (l: string, v: string, c: string) => (
     <div className="kpi"><div className="l">{l}</div><div className="v" style={{ color: c }}>{v}</div></div>
@@ -18,7 +19,7 @@ function Kpis({ deals }: { deals: Deal[] }) {
       {card("Realized P/L", money(realized), realized >= 0 ? "var(--green)" : "var(--red)")}
       {card("Projected (open)", money(projected), "var(--gold)")}
       {card("Capital deployed", money(capital), "var(--ink)")}
-      {card("Avg ROI", Math.round(avgRoi * 100) + "%", "var(--cyan)")}
+      {card("Median ROI", Math.round(medRoi * 100) + "%", "var(--cyan)")}
       {card("Win rate", Math.round(winRate * 100) + "%", "var(--purple)")}
     </div>
   );
@@ -93,32 +94,35 @@ export default function Ledger({
       {filtered.length === 0 ? (
         <div className="empty">No deals yet — hit 🧭 Explore to scan, or wait for the watch runner.</div>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead><tr>
-            <th>Item</th><th>Source</th><th>Stage</th><th>Buy</th><th>Resale</th>
-            <th>Net</th><th>ROI</th><th>Conf</th><th>Comps</th><th>Move</th><th></th>
+            <th>Item</th><th className="hide-sm">Source</th><th>Stage</th><th>Buy</th><th className="hide-sm">Resale</th>
+            <th>Net</th><th>ROI</th><th className="hide-sm">Conf</th><th className="hide-sm">Comps</th><th>Move</th><th></th>
           </tr></thead>
           <tbody>
             {filtered.map((d) => {
               const st = STAGES[d.status ?? "new"], n = dealNet(d), c = conf(d), next = NEXT[d.status ?? "new"];
               return (
                 <tr key={d.id}>
-                  <td><button className="link" onClick={() => onEdit(d)}>{d.title}</button></td>
-                  <td className="mono" style={{ color: "var(--muted2)" }}>{d.source ?? "—"}</td>
+                  <td>
+                    <button className="link" onClick={() => onEdit(d)}>{d.title}</button>
+                    {lotFlag(d.flags) && <span className="pill" style={{ marginLeft: 6, color: "var(--orange)", background: "#3a2a1a" }}>{lotFlag(d.flags)}</span>}
+                  </td>
+                  <td className="mono hide-sm" style={{ color: "var(--muted2)" }}>{d.source ?? "—"}</td>
                   <td><span className="pill" style={{ color: st.color, background: st.color + "22" }}>{st.label}</span></td>
                   <td className="mono">{money(d.boughtPrice ?? d.buy)}</td>
-                  <td className="mono">{money(d.resale)}</td>
+                  <td className="mono hide-sm">{money(d.resale)}</td>
                   <td className="mono" style={{ color: n >= 0 ? "var(--green)" : "var(--red)" }}>{money(n)}</td>
                   <td className="mono">{Math.round(dealRoi(d) * 100)}%</td>
-                  <td className="mono" style={{ color: c >= 80 ? "var(--green)" : c >= 60 ? "var(--gold)" : "var(--muted)" }}>{c}%</td>
-                  <td className="mono">{d.compCount ?? 0}</td>
+                  <td className="mono hide-sm" style={{ color: c >= 80 ? "var(--green)" : c >= 60 ? "var(--gold)" : "var(--muted)" }}>{c}%</td>
+                  <td className="mono hide-sm">{d.compCount ?? 0}</td>
                   <td>{next ? <button className="tbtn" onClick={() => onAdvance(d.id, next)}>advance</button> : "—"}</td>
                   <td>{d.url && <a className="link" href={d.url} target="_blank" rel="noopener">↗</a>}</td>
                 </tr>
               );
             })}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

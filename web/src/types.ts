@@ -21,6 +21,13 @@ export interface Deal {
   soldPrice?: number;
   actualProfit?: number;
   notes?: string;
+  flags?: string[];
+}
+
+/** "LOT ×12" extracted from a deal's flags, if present. */
+export function lotFlag(flags?: string[]): string | null {
+  const f = (flags ?? []).find((x) => x.startsWith("LOT"));
+  return f ? f.split(" — ")[0] : null;
 }
 
 export type View = "ledger" | "hunt" | "realms" | "party" | "quests" | "classv" | "boss" | "hoard" | "war" | "bestiary";

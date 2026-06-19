@@ -1,4 +1,5 @@
 import type { Deal, Stage } from "../types";
+import { lotFlag } from "../types";
 import { dealNet, dealRoi, conf, money, rarity, beastFor } from "../lib";
 
 export default function Hunt({
@@ -41,6 +42,7 @@ export default function Hunt({
                 <div className="tile" style={tile as React.CSSProperties} />
                 <div className="bt">{d.title.slice(0, 42)}</div>
                 <div className="bs">{rname} · {d.source ?? "—"}{c >= 90 ? " · ⚡CRIT" : ""}</div>
+                {lotFlag(d.flags) && <div style={{ clear: "both", marginTop: 8 }}><span className="pill" style={{ color: "var(--orange)", background: "#3a2a1a" }}>{lotFlag(d.flags)} · value = qty × comp</span></div>}
                 <div className="bounty"><div className="bountyfill" style={{ width: pct + "%" }} /></div>
                 <div className="brow">
                   <span>ROI <b>{Math.round(dealRoi(d) * 100)}%</b></span>
