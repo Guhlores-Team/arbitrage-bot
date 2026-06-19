@@ -103,6 +103,8 @@ const server = createServer(async (req, res) => {
         if (typeof body?.name === "string") patch.name = body.name.slice(0, 40);
         if (["hunter", "scrapper", "merchant"].includes(body?.classId)) patch.classId = body.classId;
         if (Array.isArray(body?.claimedQuests)) patch.claimedQuests = body.claimedQuests.map(String).slice(0, 200);
+        if (Array.isArray(body?.skills)) patch.skills = body.skills.map(String).slice(0, 50);
+        if (Array.isArray(body?.equipped)) patch.equipped = body.equipped.map(String).slice(0, 10);
         if (body?.bonusXp != null) patch.bonusXp = Math.max(0, Number(body.bonusXp));
         if (body?.lastSeenLevel != null) patch.lastSeenLevel = Number(body.lastSeenLevel);
         return json(res, 200, { game: await store.setGame(patch) });

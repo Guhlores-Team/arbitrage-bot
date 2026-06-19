@@ -68,6 +68,8 @@ export interface GameState {
   classId?: "hunter" | "scrapper" | "merchant";
   claimedQuests?: string[]; // date-stamped quest ids the player has claimed
   bonusXp?: number; // XP granted by claimed quests (added on top of deal-derived XP)
+  skills?: string[]; // unlocked skill ids (cost skill points earned by leveling)
+  equipped?: string[]; // equipped relic ids (relics are earned from big flips)
   lastSeenLevel?: number; // for "level up" detection across sessions
 }
 

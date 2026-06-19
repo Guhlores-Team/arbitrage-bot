@@ -13,9 +13,9 @@ const NAV: { icon: string; label: string; view?: View }[] = [
   { icon: "all-for-one", label: "Party", view: "party" },
   { icon: "anchor", label: "Realms", view: "realms" },
   { icon: "archery-target", label: "Quests", view: "quests" },
-  { icon: "armor-vest", label: "Class", view: "classv" },
-  { icon: "dragon-head", label: "Boss Raid" },
-  { icon: "anvil", label: "The Hoard" },
+  { icon: "armor-vest", label: "Class & Skills", view: "classv" },
+  { icon: "dragon-head", label: "Boss Raid", view: "boss" },
+  { icon: "anvil", label: "The Hoard", view: "hoard" },
 ];
 
 export default function Sidebar({

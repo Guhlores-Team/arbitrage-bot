@@ -23,7 +23,7 @@ export interface Deal {
   notes?: string;
 }
 
-export type View = "ledger" | "hunt" | "realms" | "party" | "quests" | "classv";
+export type View = "ledger" | "hunt" | "realms" | "party" | "quests" | "classv" | "boss" | "hoard";
 
 export type ClassId = "hunter" | "scrapper" | "merchant";
 
@@ -32,6 +32,8 @@ export interface Game {
   classId?: ClassId;
   claimedQuests?: string[];
   bonusXp?: number;
+  skills?: string[];
+  equipped?: string[];
   lastSeenLevel?: number;
 }
 

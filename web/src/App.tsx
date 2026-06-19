@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Deal, Game, OutcomePatch, Stage, View, SourceHealth, ClassId } from "./types";
 import { fetchDeals, patchDeal, runScan, fetchGame, saveGame, fetchHealth } from "./api";
 import { dealNet, dealRoi, conf } from "./lib";
-import { computeHero, computeQuests } from "./progression";
+import { computeHero, computeQuests, computeBoss, buffsFrom, relicsOwned, RELIC_SLOTS, SKILLS } from "./progression";
 import { isMuted, toggleMute, sfxLoot, sfxAdvance, sfxLevel } from "./sound";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -13,11 +13,11 @@ import Realms from "./components/Realms";
 import Quests from "./components/Quests";
 import ClassView from "./components/ClassView";
 import Party from "./components/Party";
+import Boss from "./components/Boss";
+import Hoard from "./components/Hoard";
 import CoinBurst from "./components/CoinBurst";
 
-export interface Filters {
-  q: string; source: string; stage: string; sort: "net" | "roi" | "conf" | "score";
-}
+export interface Filters { q: string; source: string; stage: string; sort: "net" | "roi" | "conf" | "score"; }
 
 export default function App() {
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -31,25 +31,26 @@ export default function App() {
   const [filters, setFilters] = useState<Filters>({ q: "", source: "", stage: "", sort: "net" });
 
   const load = useCallback(async () => setDeals(await fetchDeals()), []);
-  useEffect(() => {
-    void load();
-    void fetchGame().then(setGame);
-    void fetchHealth().then(setHealth);
-  }, [load]);
+  useEffect(() => { void load(); void fetchGame().then(setGame); void fetchHealth().then(setHealth); }, [load]);
 
   const flash = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(null), 2600); }, []);
   const switchView = useCallback((v: View) => { setView(v); localStorage.setItem("lq_view", v); }, []);
   const updateGame = useCallback(async (patch: Game) => { setGame((g) => ({ ...g, ...patch })); await saveGame(patch); }, []);
 
   const classId: ClassId = game.classId ?? "hunter";
-  const hero = useMemo(() => computeHero(deals, classId, game.bonusXp ?? 0), [deals, classId, game.bonusXp]);
+  const skills = game.skills ?? [];
+  const equipped = game.equipped ?? [];
+  const buffs = useMemo(() => buffsFrom(classId, skills, equipped), [classId, skills, equipped]);
+  const hero = useMemo(() => computeHero(deals, game.bonusXp ?? 0, buffs), [deals, game.bonusXp, buffs]);
   const quests = useMemo(() => computeQuests(deals, game.claimedQuests ?? []), [deals, game.claimedQuests]);
+  const boss = useMemo(() => computeBoss(deals, buffs.bossMult), [deals, buffs.bossMult]);
+  const owned = useMemo(() => relicsOwned(deals), [deals]);
+  const availableSP = Math.max(0, hero.skillPoints - skills.length);
 
-  // Level-up detection across renders/sessions.
   const initLevel = useRef(false);
   useEffect(() => {
     if (game.lastSeenLevel == null) {
-      if (!initLevel.current && deals.length >= 0) { initLevel.current = true; void updateGame({ lastSeenLevel: hero.level }); }
+      if (!initLevel.current) { initLevel.current = true; void updateGame({ lastSeenLevel: hero.level }); }
       return;
     }
     if (hero.level > game.lastSeenLevel) {
@@ -57,10 +58,9 @@ export default function App() {
       if (!muted) sfxLevel();
       void updateGame({ lastSeenLevel: hero.level });
     }
-  }, [hero.level, game.lastSeenLevel, deals.length, updateGame, flash, muted]);
+  }, [hero.level, game.lastSeenLevel, updateGame, flash, muted]);
 
   const sources = useMemo(() => [...new Set(deals.map((d) => d.source).filter(Boolean))].sort() as string[], [deals]);
-
   const filtered = useMemo(() => {
     const q = filters.q.toLowerCase();
     const key = { net: dealNet, roi: dealRoi, conf, score: (d: Deal) => d.score ?? 0 }[filters.sort];
@@ -102,30 +102,35 @@ export default function App() {
     flash(`✨ Quest claimed · +${reward} XP`);
   }, [game.claimedQuests, game.bonusXp, updateGame, flash]);
 
-  const pickRealm = useCallback((source: string) => {
-    setFilters((f) => ({ ...f, source }));
-    switchView("hunt");
-  }, [switchView]);
+  const unlockSkill = useCallback((id: string) => {
+    if (availableSP <= 0 || skills.includes(id)) return;
+    void updateGame({ skills: [...skills, id] });
+    flash(`🎓 Unlocked ${SKILLS.find((s) => s.id === id)?.name}`);
+  }, [availableSP, skills, updateGame, flash]);
 
-  const onMute = useCallback(() => setMuted(toggleMute()), []);
+  const toggleRelic = useCallback((id: string) => {
+    if (equipped.includes(id)) { void updateGame({ equipped: equipped.filter((x) => x !== id) }); return; }
+    if (equipped.length >= RELIC_SLOTS) { flash(`Only ${RELIC_SLOTS} relic slots`); return; }
+    void updateGame({ equipped: [...equipped, id] });
+  }, [equipped, updateGame, flash]);
+
+  const pickRealm = useCallback((source: string) => { setFilters((f) => ({ ...f, source })); switchView("hunt"); }, [switchView]);
 
   return (
     <div className="root">
       <Sidebar hero={hero} game={game} view={view} onView={switchView}
         onRename={() => { const n = prompt("Hero name?", game.name || "Operator"); if (n) void updateGame({ name: n }); }} />
       <main className="main">
-        <TopBar view={view} onView={switchView} onScan={scan} onReload={load} muted={muted} onMute={onMute} />
+        <TopBar view={view} onView={switchView} onScan={scan} onReload={load} muted={muted} onMute={() => setMuted(toggleMute())} />
         <div className="content">
-          {view === "ledger" && (
-            <Ledger deals={deals} filtered={filtered} filters={filters} setFilters={setFilters} sources={sources} onAdvance={advance} onEdit={setEditing} />
-          )}
-          {view === "hunt" && (
-            <Hunt deals={filtered.filter((d) => (d.status ?? "new") !== "skipped")} onAdvance={advance} onEdit={setEditing} realm={filters.source} onClearRealm={() => setFilters((f) => ({ ...f, source: "" }))} />
-          )}
+          {view === "ledger" && <Ledger deals={deals} filtered={filtered} filters={filters} setFilters={setFilters} sources={sources} onAdvance={advance} onEdit={setEditing} />}
+          {view === "hunt" && <Hunt deals={filtered.filter((d) => (d.status ?? "new") !== "skipped")} onAdvance={advance} onEdit={setEditing} realm={filters.source} onClearRealm={() => setFilters((f) => ({ ...f, source: "" }))} />}
           {view === "party" && <Party deals={deals} onAdvance={advance} onEdit={setEditing} />}
           {view === "realms" && <Realms health={health} sources={sources} active={filters.source} onPick={pickRealm} />}
           {view === "quests" && <Quests quests={quests} onClaim={claimQuest} />}
-          {view === "classv" && <ClassView current={classId} onPick={(c) => void updateGame({ classId: c })} hero={hero} />}
+          {view === "classv" && <ClassView current={classId} onPick={(c) => void updateGame({ classId: c })} skills={skills} availableSP={availableSP} onUnlock={unlockSkill} />}
+          {view === "boss" && <Boss boss={boss} bossMult={buffs.bossMult} />}
+          {view === "hoard" && <Hoard owned={owned} equipped={equipped} onToggle={toggleRelic} />}
         </div>
       </main>
       {editing && <DealEditor deal={editing} onSave={saveEdit} onClose={() => setEditing(null)} />}
