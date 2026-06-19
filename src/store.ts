@@ -179,6 +179,33 @@ export class JsonStore {
     return o;
   }
 
+  /** Create a deal by hand (e.g. snap-capture a thrift find from a phone photo). */
+  async addManualOpportunity(input: { title?: string; image?: string; buy?: number; resale?: number; source?: string; url?: string }): Promise<OpportunityView> {
+    await this.load();
+    const buy = Math.max(0, Number(input.buy) || 0);
+    const resale = Math.max(0, Number(input.resale) || 0);
+    const fees = Math.round(resale * 0.13);
+    const net = Math.round(resale - buy - fees);
+    const now = new Date().toISOString();
+    const o: OpportunityView = {
+      id: `snap_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+      title: (input.title || "Snapped find").slice(0, 160),
+      brand: null, model: null,
+      image: input.image ?? null,
+      url: input.url || "",
+      location: null,
+      buy, resale, resaleLow: resale, resaleHigh: resale, net,
+      markets: [], marginPct: buy > 0 ? net / buy : 0, fees, shipping: 0,
+      compCount: 0, matchConfidence: 1, identityConfidence: 1, condition: "unknown",
+      score: 0.5, passes: false, flags: ["manual snap"],
+      source: input.source || "snap", savedAt: now, status: "new", statusAt: now,
+    };
+    this.data.opportunities.unshift(o);
+    if (this.data.opportunities.length > MAX_OPPORTUNITIES) this.data.opportunities.length = MAX_OPPORTUNITIES;
+    await this.flush();
+    return o;
+  }
+
   /** Aggregate realized performance — what's actually paying. */
   async outcomeStats() {
     await this.load();

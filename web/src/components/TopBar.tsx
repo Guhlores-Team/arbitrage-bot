@@ -6,9 +6,9 @@ const TITLES: Record<View, string> = {
 };
 
 export default function TopBar({
-  view, onView, onScan, onReload, muted, onMute,
+  view, onView, onScan, onReload, muted, onMute, onSnap,
 }: {
-  view: View; onView: (v: View) => void; onScan: () => void; onReload: () => void; muted: boolean; onMute: () => void;
+  view: View; onView: (v: View) => void; onScan: () => void; onReload: () => void; muted: boolean; onMute: () => void; onSnap: () => void;
 }) {
   return (
     <div className="topbar">
@@ -18,6 +18,7 @@ export default function TopBar({
         <button className={view === "ledger" ? "on" : ""} onClick={() => onView("ledger")}>📊 LEDGER</button>
       </div>
       <button className="iconbtn" title={muted ? "Unmute" : "Mute"} onClick={onMute}>{muted ? "🔇" : "🔊"}</button>
+      <button className="iconbtn" title="Snap a deal (photo)" onClick={onSnap}>📸</button>
       <button className="iconbtn" title="Explore (scan)" onClick={onScan}>🧭</button>
       <button className="iconbtn" title="Refresh" onClick={onReload}>⟳</button>
     </div>

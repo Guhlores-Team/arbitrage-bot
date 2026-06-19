@@ -83,3 +83,6 @@ export const deleteSweep = (id: string) => fetch(`${API}/api/sweeps/${id}`, { me
 export const runSweep = (id: string) => jsend(`/api/sweeps/${id}/run`, "POST");
 
 export const testAlert = () => jsend("/api/notify/test", "POST");
+
+export const createManual = (input: { title?: string; image?: string; buy?: number; resale?: number; source?: string }) =>
+  jsend("/api/opportunities/manual", "POST", input).then((r) => r.opportunity as Deal | undefined);

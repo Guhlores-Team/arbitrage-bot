@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Deal, Game, OutcomePatch, Stage, View, SourceHealth, ClassId } from "./types";
-import { fetchDeals, patchDeal, runScan, fetchGame, saveGame, fetchHealth } from "./api";
+import { fetchDeals, patchDeal, runScan, fetchGame, saveGame, fetchHealth, createManual } from "./api";
+import { downscale } from "./img";
 import { dealNet, dealRoi, conf } from "./lib";
 import { computeHero, computeQuests, computeBoss, buffsFrom, relicsOwned, RELIC_SLOTS, SKILLS } from "./progression";
 import { isMuted, toggleMute, sfxLoot, sfxAdvance, sfxLevel } from "./sound";
@@ -117,12 +118,23 @@ export default function App() {
 
   const pickRealm = useCallback((source: string) => { setFilters((f) => ({ ...f, source })); switchView("hunt"); }, [switchView]);
 
+  const snapRef = useRef<HTMLInputElement>(null);
+  const onSnapFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+    flash("📸 Processing photo…");
+    const image = await downscale(f).catch(() => undefined);
+    const title = prompt("What did you snap?", "Snapped find") || "Snapped find";
+    const o = await createManual({ title, image, source: "snap" });
+    await load();
+    if (o) setEditing(o); // open the editor to set buy / resale / stage
+  }, [flash, load]);
+
   return (
     <div className="root">
       <Sidebar hero={hero} game={game} view={view} onView={switchView}
         onRename={() => { const n = prompt("Hero name?", game.name || "Operator"); if (n) void updateGame({ name: n }); }} />
       <main className="main">
-        <TopBar view={view} onView={switchView} onScan={scan} onReload={load} muted={muted} onMute={() => setMuted(toggleMute())} />
+        <TopBar view={view} onView={switchView} onScan={scan} onReload={load} muted={muted} onMute={() => setMuted(toggleMute())} onSnap={() => snapRef.current?.click()} />
         <div className="content">
           {view === "ledger" && <Ledger deals={deals} filtered={filtered} filters={filters} setFilters={setFilters} sources={sources} onAdvance={advance} onEdit={setEditing} />}
           {view === "hunt" && <Hunt deals={filtered.filter((d) => (d.status ?? "new") !== "skipped")} onAdvance={advance} onEdit={setEditing} realm={filters.source} onClearRealm={() => setFilters((f) => ({ ...f, source: "" }))} />}
@@ -135,6 +147,7 @@ export default function App() {
           {view === "war" && <WarTable onToast={flash} />}
         </div>
       </main>
+      <input ref={snapRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={onSnapFile} />
       {editing && <DealEditor deal={editing} onSave={saveEdit} onClose={() => setEditing(null)} />}
       <CoinBurst trigger={burst} />
       {toast && <div className="toast">{toast}</div>}

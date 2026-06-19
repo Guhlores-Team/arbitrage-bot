@@ -127,6 +127,18 @@ const server = createServer(async (req, res) => {
       return job ? json(res, 200, job) : json(res, 404, { error: "job not found" });
     }
 
+    if (method === "POST" && path === "/api/opportunities/manual") {
+      const body = await readBody(req);
+      const o = await store.addManualOpportunity({
+        title: typeof body?.title === "string" ? body.title : undefined,
+        image: typeof body?.image === "string" ? body.image : undefined,
+        buy: body?.buy, resale: body?.resale,
+        source: typeof body?.source === "string" ? body.source : "snap",
+        url: typeof body?.url === "string" ? body.url : undefined,
+      });
+      return json(res, 200, { opportunity: o });
+    }
+
     if (path === "/api/opportunities") {
       if (method === "GET") {
         return json(res, 200, {
