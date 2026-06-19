@@ -70,6 +70,20 @@ export function contextOptions(fp: Fingerprint, headless: boolean, source?: stri
   };
 }
 
+/**
+ * Browser geolocation for local-pickup sources (OfferUp, etc.). These SPAs key
+ * their results off the browser's location, so on a cloud VM they return deals
+ * near the datacenter — not near you. Set SCRAPER_LAT + SCRAPER_LNG to your area
+ * and we hand the browser those coords so search results are actually local.
+ * Returns {} when unset (falls back to the source's IP-based default).
+ */
+export function geoContextOptions(): { geolocation?: { latitude: number; longitude: number; accuracy: number }; permissions?: string[] } {
+  const lat = Number(process.env.SCRAPER_LAT);
+  const lng = Number(process.env.SCRAPER_LNG);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return {};
+  return { geolocation: { latitude: lat, longitude: lng, accuracy: 50 }, permissions: ["geolocation"] };
+}
+
 /** Navigate with a few retries + backoff; transient nav failures are common. */
 export async function gotoWithRetry(page: any, url: string, opts: any = {}, tries = 3): Promise<void> {
   let lastErr: unknown;
