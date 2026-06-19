@@ -20,7 +20,16 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
   return cache;
 }
 
-/** Comp markets: dashboard setting → env → default. */
+/**
+ * Comp markets: dashboard setting → COMP_SOURCES env → smart default.
+ *
+ * Zero-config: if you've set a SERPAPI_KEY but no explicit source, use SerpApi —
+ * it returns real comps out of the box (eBay engine, incl. sold), so dropping
+ * one key into .env is enough. Otherwise fall back to the eBay connector.
+ */
 export function effectiveCompSources(): string {
-  return cache.compSources || process.env.COMP_SOURCES || "ebay";
+  const explicit = cache.compSources || process.env.COMP_SOURCES;
+  if (explicit) return explicit;
+  if (process.env.SERPAPI_KEY) return "serpapi";
+  return "ebay";
 }

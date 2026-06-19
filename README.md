@@ -67,6 +67,23 @@ npm run doctor                                        # live self-test of every 
 npm test                                              # node:test suite
 ```
 
+### Turn on real comps in one step (SerpApi)
+
+The fastest way to get **real** valuations (no eBay approval needed): drop a
+SerpApi key into `.env` and that's it —
+
+```bash
+echo "SERPAPI_KEY=your_key_here" >> .env
+npm run doctor          # comp check should read: serpapi/ebay (sold)
+```
+
+With `SERPAPI_KEY` set and no explicit `COMP_SOURCES`, the engine auto-selects
+SerpApi. SerpApi scrapes server-side, so its **eBay engine returns eBay data
+(including SOLD prices)** without the 403 you hit scraping eBay directly. Tune
+with `SERPAPI_ENGINE` (`ebay` default, or `google_shopping`) and
+`SERPAPI_EBAY_SOLD` (`true` default = realized sold prices; `false` = active
+asks). Free tier is 100 searches/month.
+
 ## Deploy on a VM (always-on, one process)
 
 For a small VM (≈2 vCPU / 4 GB, e.g. an `e2-medium`) running alongside other
