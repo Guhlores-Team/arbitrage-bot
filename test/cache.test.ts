@@ -62,3 +62,39 @@ test("delegates market and basis to the inner connector", () => {
   assert.equal(c.market, "ebay");
   assert.equal(c.basis, "sold");
 });
+
+test("concurrent identical queries share one in-flight lookup (parallel-scan dedup)", async () => {
+  let calls = 0;
+  const inner: CompConnector = {
+    market: "ebay",
+    basis: "sold",
+    async getSoldComps(q: string): Promise<SoldComp[]> {
+      calls++;
+      await new Promise((r) => setTimeout(r, 10));
+      return [{ id: q, title: q, soldPrice: 100, currency: "USD", condition: "good", url: "u", market: "ebay" }];
+    },
+  };
+  const c = new CachingCompConnector(inner, 60_000);
+  const [a, b] = await Promise.all([c.getSoldComps("same"), c.getSoldComps("same")]);
+  assert.equal(calls, 1, "only one paid lookup for two concurrent identical queries");
+  assert.equal(a.length, 1);
+  assert.equal(b.length, 1);
+});
+
+test("a failed lookup is not cached (retried next call)", async () => {
+  let calls = 0;
+  const inner: CompConnector = {
+    market: "ebay",
+    basis: "sold",
+    async getSoldComps(q: string): Promise<SoldComp[]> {
+      calls++;
+      if (calls === 1) throw new Error("transient");
+      return [{ id: q, title: q, soldPrice: 100, currency: "USD", condition: "good", url: "u", market: "ebay" }];
+    },
+  };
+  const c = new CachingCompConnector(inner, 60_000);
+  await assert.rejects(() => c.getSoldComps("q"));
+  const r = await c.getSoldComps("q");
+  assert.equal(calls, 2);
+  assert.equal(r.length, 1);
+});

@@ -160,3 +160,70 @@ test("stress: 2000 listings complete, are scored, and come back sorted by score"
   }
   assert.ok(stats.durationMs >= 0);
 });
+
+test("junk pre-filter: an off-topic identity is skipped before any comp search", async () => {
+  // Title identifies as an Apple Watch; we searched for a Nintendo Switch.
+  const offTopic = listing({ rawTitle: "Apple Watch Series 8 GPS 45mm", price: 120 });
+  const { opportunities, stats } = await runPipelineDetailed(
+    new StubSource([offTopic]),
+    new StubComp(comps250),
+    { query: "nintendo switch" },
+    { thresholds: GENEROUS },
+  );
+  assert.equal(stats.offTopic, 1);
+  assert.equal(stats.compLookups, 0, "no comp search spent on a junk listing");
+  assert.equal(opportunities.length, 0);
+});
+
+test("junk pre-filter: on-topic listing still passes through", async () => {
+  const { stats } = await runPipelineDetailed(
+    new StubSource([listing({ rawTitle: "Nintendo Switch OLED", price: 120 })]),
+    new StubComp(comps250),
+    { query: "nintendo switch" },
+    { thresholds: GENEROUS },
+  );
+  assert.equal(stats.offTopic, 0);
+  assert.equal(stats.compLookups, 1);
+});
+
+test("PREFILTER_OFFTOPIC=false disables the junk filter", async () => {
+  process.env.PREFILTER_OFFTOPIC = "false";
+  try {
+    const { stats } = await runPipelineDetailed(
+      new StubSource([listing({ rawTitle: "Apple Watch Series 8", price: 120 })]),
+      new StubComp(comps250),
+      { query: "nintendo switch" },
+      { thresholds: GENEROUS },
+    );
+    assert.equal(stats.offTopic, 0);
+    assert.equal(stats.compLookups, 1); // not skipped
+  } finally {
+    delete process.env.PREFILTER_OFFTOPIC;
+  }
+});
+
+test("listings are processed concurrently (more than one comp call in flight)", async () => {
+  let inFlight = 0;
+  let maxInFlight = 0;
+  class TrackingComp implements CompConnector {
+    readonly market = "ebay";
+    readonly basis = "sold" as const;
+    async getSoldComps() {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return comps250;
+    }
+  }
+  process.env.PIPELINE_CONCURRENCY = "4";
+  try {
+    const many = Array.from({ length: 12 }, (_, i) => listing({ id: "L" + i, price: 120, rawTitle: "Nintendo Switch OLED" }));
+    const { stats } = await runPipelineDetailed(new StubSource(many), new TrackingComp(), { query: "nintendo switch" }, { thresholds: GENEROUS });
+    assert.equal(stats.scored, 12);
+    assert.ok(maxInFlight > 1, `expected concurrent comp calls, saw max ${maxInFlight}`);
+    assert.ok(maxInFlight <= 4, `must respect the concurrency cap, saw ${maxInFlight}`);
+  } finally {
+    delete process.env.PIPELINE_CONCURRENCY;
+  }
+});

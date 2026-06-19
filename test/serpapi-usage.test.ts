@@ -13,7 +13,11 @@ afterEach(() => {
   resetSerpApiSearchCount();
   delete process.env.SERPAPI_ENGINE;
   delete process.env.SERPAPI_EBAY_SOLD;
+  delete process.env.SERPAPI_MAX_PER_RUN;
+  delete process.env.SERPAPI_MIN_RESERVE;
 });
+
+const EBAY_RESULT = { organic_results: [{ position: 1, title: "Nintendo Switch OLED", price: { extracted: 250 }, link: "https://ebay/x" }] };
 
 test("serpApiUsage returns null without a key (no wasted call)", async () => {
   assert.equal(await serpApiUsage(""), null);
@@ -66,4 +70,36 @@ test("mock mode (no key) does not spend a search credit", async () => {
   const c = new SerpApiShoppingConnector("");
   await c.getSoldComps("switch", 5);
   assert.equal(serpApiSearchCount(), 0);
+});
+
+test("SERPAPI_MAX_PER_RUN caps live searches and degrades to empty results", async () => {
+  process.env.SERPAPI_ENGINE = "ebay";
+  process.env.SERPAPI_MAX_PER_RUN = "2";
+  globalThis.fetch = (async () => ({ ok: true, json: async () => EBAY_RESULT }) as any) as typeof fetch;
+
+  resetSerpApiSearchCount();
+  const c = new SerpApiShoppingConnector("key");
+  await c.getSoldComps("a", 5);
+  await c.getSoldComps("b", 5);
+  const third = await c.getSoldComps("c", 5); // guarded
+  assert.equal(serpApiSearchCount(), 2);
+  assert.deepEqual(third, []);
+});
+
+test("monthly reserve stops live searches near the cap", async () => {
+  process.env.SERPAPI_ENGINE = "ebay";
+  process.env.SERPAPI_MIN_RESERVE = "5";
+  globalThis.fetch = (async (u: any) => {
+    const url = String(u);
+    if (url.includes("account.json")) {
+      return { ok: true, json: async () => ({ plan_name: "Free", searches_per_month: 250, this_month_usage: 245, total_searches_left: 5 }) };
+    }
+    return { ok: true, json: async () => EBAY_RESULT };
+  }) as any as typeof fetch;
+
+  resetSerpApiSearchCount();
+  const c = new SerpApiShoppingConnector("key");
+  const r = await c.getSoldComps("a", 5); // left 5, reserve 5 -> blocked
+  assert.equal(serpApiSearchCount(), 0);
+  assert.deepEqual(r, []);
 });

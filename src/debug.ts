@@ -46,6 +46,7 @@ async function main() {
   console.log("\n  Funnel:");
   console.log(`   listings pulled        : ${stats.listings}`);
   console.log(`   ⤷ priced out (cap)     : ${stats.pricedOut}`);
+  console.log(`   ⤷ off-topic (junk)     : ${stats.offTopic}`);
   console.log(`   ⤷ no usable comps      : ${stats.noComps}`);
   console.log(`   ⤷ asking >= median     : ${stats.askAboveMedian}`);
   console.log(`   ⤷ no verified match    : ${stats.noMatch}`);

@@ -1,15 +1,43 @@
 import type { SoldComp } from "../types.js";
 import type { CompConnector } from "./connector.js";
+import { log } from "../log.js";
 
 /** Live SerpApi searches made by this process (each costs one search credit). */
 let liveSearches = 0;
+// Budget state: undefined = not yet checked, null = unknown (don't guard).
+let budget: { left: number } | null | undefined;
+
 /** Searches this process has spent — surfaced by the debug console / doctor. */
 export function serpApiSearchCount(): number {
   return liveSearches;
 }
-/** Reset the per-run counter (tests, or a fresh scan session). */
+/** Reset the per-run counter + budget state (tests, or a fresh scan session). */
 export function resetSerpApiSearchCount(): void {
   liveSearches = 0;
+  budget = undefined;
+}
+
+/**
+ * Quota guard: returns true when we should stop spending live searches, so a
+ * scan degrades gracefully (returns no comps) instead of erroring at the cap.
+ *   SERPAPI_MAX_PER_RUN  hard cap on searches per process (0 = unlimited)
+ *   SERPAPI_MIN_RESERVE  keep this many monthly searches in reserve (default 0)
+ * The monthly figure is read once per run from the (free) account endpoint.
+ */
+async function budgetExhausted(key: string): Promise<boolean> {
+  const maxPerRun = Math.max(0, Number(process.env.SERPAPI_MAX_PER_RUN ?? 0));
+  if (maxPerRun && liveSearches >= maxPerRun) return true;
+
+  const reserve = Math.max(0, Number(process.env.SERPAPI_MIN_RESERVE ?? 0));
+  if (budget === undefined) {
+    try {
+      const u = await serpApiUsage(key);
+      budget = u && u.total > 0 ? { left: u.left } : null; // only guard on a confident total
+    } catch {
+      budget = null;
+    }
+  }
+  return budget != null && budget.left - liveSearches <= reserve;
 }
 
 export interface SerpApiUsage {
@@ -88,6 +116,10 @@ export class SerpApiShoppingConnector implements CompConnector {
       params.set("LH_Sold", "1");
       params.set("LH_Complete", "1");
     }
+    if (await budgetExhausted(this.key)) {
+      log.warn("serpapi: quota guard — skipping live search", { left: budget?.left ?? null, spent: liveSearches });
+      return [];
+    }
     liveSearches++;
     const res = await fetch("https://serpapi.com/search.json?" + params);
     if (!res.ok) throw new Error(`serpapi ebay ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -111,6 +143,10 @@ export class SerpApiShoppingConnector implements CompConnector {
     const url =
       "https://serpapi.com/search.json?" +
       new URLSearchParams({ engine: "google_shopping", q: searchString, api_key: this.key, num: String(Math.min(limit, 40)) });
+    if (await budgetExhausted(this.key)) {
+      log.warn("serpapi: quota guard — skipping live search", { left: budget?.left ?? null, spent: liveSearches });
+      return [];
+    }
     liveSearches++;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`serpapi ${res.status}: ${(await res.text()).slice(0, 200)}`);

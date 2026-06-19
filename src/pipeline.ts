@@ -23,6 +23,7 @@ export interface PipelineOpts {
 export interface PipelineStats {
   listings: number; // pulled from the source
   pricedOut: number; // skipped: over hardPriceCap
+  offTopic: number; // skipped: identified product unrelated to the query (junk pre-filter)
   noComps: number; // skipped: no usable comps for the identity
   askAboveMedian: number; // skipped: asking >= median comp (no headroom)
   noMatch: number; // skipped: no comp verified as the same product
@@ -33,7 +34,33 @@ export interface PipelineStats {
 }
 
 function emptyStats(): PipelineStats {
-  return { listings: 0, pricedOut: 0, noComps: 0, askAboveMedian: 0, noMatch: 0, scored: 0, passed: 0, compLookups: 0, durationMs: 0 };
+  return { listings: 0, pricedOut: 0, offTopic: 0, noComps: 0, askAboveMedian: 0, noMatch: 0, scored: 0, passed: 0, compLookups: 0, durationMs: 0 };
+}
+
+const STOPWORDS = new Set(["the", "a", "an", "for", "with", "and", "of", "in", "to", "new", "used", "lot"]);
+
+function tokenize(s: string): string[] {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !STOPWORDS.has(w));
+}
+
+/**
+ * Conservative junk pre-filter: skip a listing BEFORE spending a comp search
+ * when the identified product shares NO meaningful token with the search query
+ * (e.g. an "Apple Watch … Nintendo switch" keyword-stuffed listing identifies as
+ * an Apple Watch — not what we searched for). Only the zero-overlap case is
+ * dropped, so legitimate items are never filtered. Disable with
+ * PREFILTER_OFFTOPIC=false.
+ */
+function isOffTopic(query: string, identity: { searchString: string; brand?: string; model?: string }): boolean {
+  if ((process.env.PREFILTER_OFFTOPIC ?? "true") === "false") return false;
+  const q = new Set(tokenize(query));
+  if (q.size === 0) return false; // no usable query terms → don't filter
+  const hay = tokenize([identity.searchString, identity.brand ?? "", identity.model ?? ""].join(" "));
+  return !hay.some((w) => q.has(w));
 }
 
 /**
@@ -70,15 +97,28 @@ export async function runPipelineDetailed(
   log.debug("pipeline: source listings", { source: source.source, count: listings.length });
   const opportunities: Opportunity[] = [];
 
-  for (const listing of listings) {
+  // Process listings concurrently (the identify/comp steps are I/O-bound and the
+  // dominant latency). Cap with PIPELINE_CONCURRENCY so we don't hammer the
+  // vision API / comp source. Stats + opportunities mutate safely on JS's single
+  // thread; results are sorted at the end so processing order doesn't matter.
+  const concurrency = Math.max(1, Number(process.env.PIPELINE_CONCURRENCY ?? 5));
+
+  const processListing = async (listing: (typeof listings)[number]): Promise<void> => {
     if (opts.hardPriceCap && listing.price > opts.hardPriceCap) {
       stats.pricedOut++;
       log.debug("skip: over price cap", { id: listing.id, price: listing.price, cap: opts.hardPriceCap });
-      continue;
+      return;
     }
 
     // 1. identify the real product (vision + text)
     const identity = await identifyProduct(listing);
+
+    // 1a. conservative junk pre-filter: skip clearly off-topic items before paying
+    if (isOffTopic(query.query, identity)) {
+      stats.offTopic++;
+      log.debug("skip: off-topic (junk pre-filter)", { id: listing.id, query: query.query, identified: identity.searchString });
+      return;
+    }
 
     // 2. pull sold comps from the sell market (the paid call — count it)
     stats.compLookups++;
@@ -88,7 +128,7 @@ export async function runPipelineDetailed(
     if (rawComps.length === 0) {
       stats.noComps++;
       log.debug("skip: no usable comps", { id: listing.id, q: identity.searchString });
-      continue;
+      return;
     }
 
     // 2a. cheap price pre-filter: if asking >= median sold, skip the LLM verify
@@ -96,7 +136,7 @@ export async function runPipelineDetailed(
     if (listing.price > 0 && listing.price >= quickMedian) {
       stats.askAboveMedian++;
       log.debug("skip: asking >= median comp", { id: listing.id, price: listing.price, median: quickMedian });
-      continue;
+      return;
     }
 
     // 3. verify which comps truly match (LLM rerank, cached)
@@ -104,7 +144,7 @@ export async function runPipelineDetailed(
     if (verified.length === 0) {
       stats.noMatch++;
       log.debug("skip: no verified match", { id: listing.id, q: identity.searchString });
-      continue;
+      return;
     }
     const matchedComps = verified.map((v) => v.comp);
     const matchConfidence = avg(verified.map((v) => v.verdict.confidence));
@@ -151,11 +191,29 @@ export async function runPipelineDetailed(
       score,
       flags: passes ? flags : [...flags, "DOES NOT PASS THRESHOLDS"],
     });
-  }
+  };
+
+  await mapLimit(listings, concurrency, processListing);
 
   stats.durationMs = Date.now() - t0;
   log.info("pipeline: funnel", stats);
   return { opportunities: opportunities.sort((a, b) => b.score - a.score), stats };
+}
+
+/** Run `fn` over `items` with at most `limit` in flight at once. */
+async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const item = items[next++];
+      try {
+        await fn(item);
+      } catch (e: any) {
+        log.warn("pipeline: listing failed", { error: e?.message ?? String(e) });
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
 function median(xs: number[]): number {

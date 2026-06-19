@@ -13,7 +13,9 @@ import { log } from "../log.js";
  */
 export class CachingCompConnector implements CompConnector {
   readonly market: string;
-  private cache = new Map<string, { at: number; comps: SoldComp[] }>();
+  // Store the in-flight promise (not just the result) so concurrent identical
+  // queries during a parallel scan share a single paid lookup instead of racing.
+  private cache = new Map<string, { at: number; comps: Promise<SoldComp[]> }>();
 
   constructor(
     private inner: CompConnector,
@@ -35,10 +37,15 @@ export class CachingCompConnector implements CompConnector {
     if (hit && Date.now() - hit.at < this.ttlMs) {
       this.hits++;
       log.debug("comp cache hit", { q: key });
-      return hit.comps.slice(0, limit);
+      return (await hit.comps).slice(0, limit);
     }
-    const comps = await this.inner.getSoldComps(searchString, limit);
-    this.cache.set(key, { at: Date.now(), comps });
-    return comps;
+    const promise = this.inner.getSoldComps(searchString, limit);
+    this.cache.set(key, { at: Date.now(), comps: promise });
+    try {
+      return (await promise).slice(0, limit);
+    } catch (e) {
+      this.cache.delete(key); // never cache a failed lookup
+      throw e;
+    }
   }
 }

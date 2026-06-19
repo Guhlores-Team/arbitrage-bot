@@ -97,11 +97,20 @@ npm run debug -- "airpods pro" offerup 150   # query, source, price cap
 ```
 
 Forces verbose logs and runs one real scan, then prints the **funnel** (how many
-listings dropped at each stage — priced out / no comps / asking ≥ median / no
-match), the **top opportunities** with flags, your **SerpApi quota**, and the
-**comp lookups this run cost**. The funnel tells you whether a dry scan died on
-price, comps, or matching. Set `DEBUG=1` (or `LOG_LEVEL=debug`) on any command
-(`npm run watch`, `npm run serve`) for the same per-listing logging.
+listings dropped at each stage — priced out / off-topic / no comps / asking ≥
+median / no match), the **top opportunities** with flags, your **SerpApi quota**,
+and the **comp lookups this run cost**. The funnel tells you whether a dry scan
+died on price, comps, or matching. Set `DEBUG=1` (or `LOG_LEVEL=debug`) on any
+command (`npm run watch`, `npm run serve`) for the same per-listing logging.
+
+### Performance & quota knobs
+
+| env | default | what it does |
+|-----|---------|--------------|
+| `PIPELINE_CONCURRENCY` | `5` | listings identified/comped in parallel — the main scan-speed lever (the identify/vision step is the bottleneck) |
+| `PREFILTER_OFFTOPIC` | `true` | skip listings whose identified product shares **no** term with your query (keyword-stuffed junk) *before* spending a comp search; only the zero-overlap case is dropped |
+| `SERPAPI_MIN_RESERVE` | `0` | keep this many monthly SerpApi searches in reserve — once near the cap, scans return no comps instead of erroring |
+| `SERPAPI_MAX_PER_RUN` | `0` (off) | hard cap on SerpApi searches per process — a safety belt against a runaway scan burning the month |
 
 ## Deploy on a VM (always-on, one process)
 
