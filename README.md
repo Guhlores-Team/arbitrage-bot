@@ -129,6 +129,44 @@ right now. Reuses one comp cache across queries, so it's quota-cheap. Args:
 `[queries (comma-separated)] [source] [hardPriceCap]`; `CALIBRATE_LIMIT` (default
 12) sets listings pulled per query.
 
+### Going live (production checklist)
+
+A working, quota-aware setup that scans only what pays and what isn't blocked.
+Put these in `.env`:
+
+```bash
+# Thresholds — from `npm run calibrate` (surface deals worth acting on)
+MIN_MARGIN_PCT=0.20
+MIN_ABSOLUTE_PROFIT=25
+MIN_MATCH_CONFIDENCE=0.8
+
+# SerpApi quota stewardship (free tier = 250 sold-comp lookups/month)
+COMP_CACHE_TTL_MIN=1440      # 24h cache → re-scans cost 0 searches; only new listings spend quota
+SERPAPI_MIN_RESERVE=10       # stop comping near the cap instead of erroring
+
+# Pipeline
+PIPELINE_CONCURRENCY=5       # parallel identify/comp; raise if your API limits allow
+
+# Alerts (set at least one, else alerts are console-only)
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_ID=...
+# or: ALERT_WEBHOOK_URL=...  (Slack / Discord)
+```
+
+Then configure a sweep in the dashboard (`npm run dashboard` → Watch tab) pointed
+at **only the sources that work from your IP** and **categories that calibrated
+profitably** — skip sources that 403/500 (they waste a scan) and categories that
+ran break-even:
+
+- **Sources:** `offerup,facebook,mercari` (drop craigslist/shopgoodwill unless a
+  residential proxy covers them — see `SCRAPER_PROXY` / `SCRAPER_PROXY_SOURCES`)
+- **Keywords:** your winners, e.g. `nintendo switch, pokemon, lego, funko pop, zelda`
+
+Run `npm run doctor` to confirm sources + quota, then `npm run watch` (or
+`npm run serve` to run the dashboard and scheduler in one process). Steady-state
+SerpApi cost is just newly-listed items; if you outgrow 250/month, upgrade the
+SerpApi plan rather than DIY-scraping eBay (its anti-bot blocks plain crawlers).
+
 ## Deploy on a VM (always-on, one process)
 
 For a small VM (≈2 vCPU / 4 GB, e.g. an `e2-medium`) running alongside other
