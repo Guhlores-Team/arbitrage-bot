@@ -187,6 +187,12 @@
     .hero { padding: 16px; } .hero .big { width: 100%; }
     .panel { padding: 14px; }
     table.wl { font-size: 13px; min-width: 540px; } /* let it scroll inside .table-wrap rather than crush columns */
+    /* settings: stack each row's label over its value/control so long env-var
+       lists and inputs wrap instead of overflowing the viewport */
+    .kv { flex-direction: column; align-items: stretch; gap: 5px; }
+    .kv .muted { text-align: left; }
+    .sliders { grid-template-columns: 1fr !important; }
+    #settingsConfig input, #settingsConfig select { width: 100% !important; max-width: none !important; }
   }
 </style>
 </head>
@@ -647,7 +653,7 @@ async function renderSettingsConfig() {
     <div class="kv"><span>Comp markets to value against</span></div>
     <label class="checkbox" style="margin:6px 0 8px"><input type="checkbox" id="cmAuto" ${isAuto ? "checked" : ""}/> auto (route by category: games→PriceCharting, sneakers→StockX, else eBay)</label>
     <div id="cmList" style="margin-bottom:14px; ${isAuto ? "opacity:.45" : ""}">${markets}</div>
-    <div class="sliders" style="grid-template-columns:repeat(3,1fr)">
+    <div class="sliders">
       <div><label>Min margin %</label><input type="number" id="setMargin" step="0.05" min="0" max="1" value="${th.minMarginPct ?? 0.25}"/></div>
       <div><label>Min net profit $</label><input type="number" id="setProfit" step="5" min="0" value="${th.minAbsoluteProfit ?? 20}"/></div>
       <div><label>Min match confidence</label><input type="number" id="setConf" step="0.05" min="0" max="1" value="${th.minMatchConfidence ?? 0.8}"/></div>
