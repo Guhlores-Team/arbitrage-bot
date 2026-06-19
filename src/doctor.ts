@@ -2,6 +2,7 @@ import "./env.js";
 import { health } from "./health.js";
 import { pickSource } from "./sources.js";
 import { buildComper } from "./comps.js";
+import { serpApiUsage } from "./connectors/serpapi.js";
 
 /**
  * Preflight self-test — run on the machine you'll actually scrape from:
@@ -43,6 +44,18 @@ async function probeComps(): Promise<string> {
   }
 }
 
+async function serpApiQuotaLine(): Promise<string> {
+  try {
+    const u = await withTimeout(serpApiUsage(), 15_000);
+    if (!u) return "no key";
+    const pct = u.total ? Math.round((u.left / u.total) * 100) : 0;
+    const warn = u.left <= 20 ? "  ⚠ nearly out" : "";
+    return `${u.left} left / ${u.total} this month (${u.used} used, ${pct}%) — plan ${u.plan}${warn}`;
+  } catch (e: any) {
+    return `check failed (${e?.message ?? e})`;
+  }
+}
+
 async function main() {
   console.log("\n  Arbitrage Engine — doctor\n  " + "─".repeat(48));
 
@@ -52,6 +65,7 @@ async function main() {
   console.log(`  Comp source          : ${h.comps.source} (${h.comps.note})`);
   console.log(`  Scraper proxy        : ${h.proxy ? "on (SCRAPER_PROXY)" : "off — datacenter IPs may be blocked"}`);
   console.log(`  Alerts               : ${h.notifiers.any ? "configured" : "off"}`);
+  if (process.env.SERPAPI_KEY) console.log(`  SerpApi quota        : ${await serpApiQuotaLine()}`);
   console.log("\n  Static readiness:");
   for (const s of h.sources) console.log(`   ${ok(s.ready)} ${s.source}: ${s.note}`);
 

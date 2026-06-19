@@ -1,6 +1,40 @@
 import type { SoldComp } from "../types.js";
 import type { CompConnector } from "./connector.js";
 
+/** Live SerpApi searches made by this process (each costs one search credit). */
+let liveSearches = 0;
+/** Searches this process has spent — surfaced by the debug console / doctor. */
+export function serpApiSearchCount(): number {
+  return liveSearches;
+}
+/** Reset the per-run counter (tests, or a fresh scan session). */
+export function resetSerpApiSearchCount(): void {
+  liveSearches = 0;
+}
+
+export interface SerpApiUsage {
+  plan: string;
+  used: number; // searches used this month
+  left: number; // searches remaining this month
+  total: number; // monthly allowance
+}
+
+/**
+ * Authoritative quota from SerpApi's account endpoint (doesn't spend a search).
+ * Returns null with no key. Lets the doctor/debug console tell you how close you
+ * are to the free-tier cap before it bites.
+ */
+export async function serpApiUsage(key = process.env.SERPAPI_KEY ?? ""): Promise<SerpApiUsage | null> {
+  if (!key) return null;
+  const res = await fetch("https://serpapi.com/account.json?" + new URLSearchParams({ api_key: key }));
+  if (!res.ok) throw new Error(`serpapi account ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const j: any = await res.json();
+  const used = Number(j.this_month_usage ?? 0);
+  const left = Number(j.total_searches_left ?? j.plan_searches_left ?? 0);
+  const total = Number(j.searches_per_month ?? used + left);
+  return { plan: String(j.plan_name ?? j.plan_id ?? "unknown"), used, left, total };
+}
+
 /**
  * Comps via SerpApi — SerpApi does the scraping (and anti-bot) on their side, so
  * you get clean prices without being blocked. Two engines, chosen by env:
@@ -54,6 +88,7 @@ export class SerpApiShoppingConnector implements CompConnector {
       params.set("LH_Sold", "1");
       params.set("LH_Complete", "1");
     }
+    liveSearches++;
     const res = await fetch("https://serpapi.com/search.json?" + params);
     if (!res.ok) throw new Error(`serpapi ebay ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const json: any = await res.json();
@@ -76,6 +111,7 @@ export class SerpApiShoppingConnector implements CompConnector {
     const url =
       "https://serpapi.com/search.json?" +
       new URLSearchParams({ engine: "google_shopping", q: searchString, api_key: this.key, num: String(Math.min(limit, 40)) });
+    liveSearches++;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`serpapi ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const json: any = await res.json();

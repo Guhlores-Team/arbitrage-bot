@@ -3,6 +3,7 @@ import { identifyProduct } from "./extraction/identify.js";
 import { verifyMatches } from "./matching/match.js";
 import { computeMargin } from "./valuation/value.js";
 import { scoreOpportunity, THRESHOLDS, type Thresholds } from "./scoring/score.js";
+import { log } from "./log.js";
 import type { Opportunity, MarketStat, SoldComp } from "./types.js";
 
 export interface PipelineOpts {
@@ -12,6 +13,27 @@ export interface PipelineOpts {
   identifyConfidenceFloor?: number;
   /** override scoring thresholds (dashboard tuning); defaults to env THRESHOLDS */
   thresholds?: Thresholds;
+}
+
+/**
+ * Funnel counters: how many listings dropped at each stage and why. Surfaced by
+ * the debug console so you can see whether a dry scan died on price, comps, or
+ * matching — and the per-run cost (how many comp lookups it made).
+ */
+export interface PipelineStats {
+  listings: number; // pulled from the source
+  pricedOut: number; // skipped: over hardPriceCap
+  noComps: number; // skipped: no usable comps for the identity
+  askAboveMedian: number; // skipped: asking >= median comp (no headroom)
+  noMatch: number; // skipped: no comp verified as the same product
+  scored: number; // produced an opportunity (pass or fail)
+  passed: number; // opportunities that cleared thresholds
+  compLookups: number; // comp queries made (your SerpApi/eBay call count)
+  durationMs: number;
+}
+
+function emptyStats(): PipelineStats {
+  return { listings: 0, pricedOut: 0, noComps: 0, askAboveMedian: 0, noMatch: 0, scored: 0, passed: 0, compLookups: 0, durationMs: 0 };
 }
 
 /**
@@ -27,26 +49,63 @@ export async function runPipeline(
   query: SearchQuery,
   opts: PipelineOpts = {},
 ): Promise<Opportunity[]> {
+  return (await runPipelineDetailed(source, comper, query, opts)).opportunities;
+}
+
+/**
+ * Same pipeline, but also returns the funnel {@link PipelineStats}. Use this
+ * (over {@link runPipeline}) when you want to see why listings dropped or how
+ * many comp lookups a scan cost — the debug console and tests do.
+ */
+export async function runPipelineDetailed(
+  source: SourceConnector,
+  comper: CompConnector,
+  query: SearchQuery,
+  opts: PipelineOpts = {},
+): Promise<{ opportunities: Opportunity[]; stats: PipelineStats }> {
+  const t0 = Date.now();
+  const stats = emptyStats();
   const listings = await source.search(query);
+  stats.listings = listings.length;
+  log.debug("pipeline: source listings", { source: source.source, count: listings.length });
   const opportunities: Opportunity[] = [];
 
   for (const listing of listings) {
-    if (opts.hardPriceCap && listing.price > opts.hardPriceCap) continue;
+    if (opts.hardPriceCap && listing.price > opts.hardPriceCap) {
+      stats.pricedOut++;
+      log.debug("skip: over price cap", { id: listing.id, price: listing.price, cap: opts.hardPriceCap });
+      continue;
+    }
 
     // 1. identify the real product (vision + text)
     const identity = await identifyProduct(listing);
 
-    // 2. pull sold comps from the sell market
-    const rawComps = await comper.getSoldComps(identity.searchString, 20);
-    if (rawComps.length === 0) continue;
+    // 2. pull sold comps from the sell market (the paid call — count it)
+    stats.compLookups++;
+    const rawComps = (await comper.getSoldComps(identity.searchString, 20)).filter(
+      (c) => Number.isFinite(c.soldPrice) && c.soldPrice > 0,
+    );
+    if (rawComps.length === 0) {
+      stats.noComps++;
+      log.debug("skip: no usable comps", { id: listing.id, q: identity.searchString });
+      continue;
+    }
 
     // 2a. cheap price pre-filter: if asking >= median sold, skip the LLM verify
     const quickMedian = median(rawComps.map((c) => c.soldPrice));
-    if (listing.price > 0 && listing.price >= quickMedian) continue;
+    if (listing.price > 0 && listing.price >= quickMedian) {
+      stats.askAboveMedian++;
+      log.debug("skip: asking >= median comp", { id: listing.id, price: listing.price, median: quickMedian });
+      continue;
+    }
 
     // 3. verify which comps truly match (LLM rerank, cached)
     const verified = await verifyMatches(identity, rawComps);
-    if (verified.length === 0) continue;
+    if (verified.length === 0) {
+      stats.noMatch++;
+      log.debug("skip: no verified match", { id: listing.id, q: identity.searchString });
+      continue;
+    }
     const matchedComps = verified.map((v) => v.comp);
     const matchConfidence = avg(verified.map((v) => v.verdict.confidence));
     // typical condition gap between the comps and our item (signed median)
@@ -73,6 +132,8 @@ export async function runPipeline(
     if (margin.conditionDiscount > 0) flags.push(`condition discount −$${margin.conditionDiscount} vs comps`);
     if (margin.spread > 0.6) flags.push("wide price spread — resale uncertain");
 
+    stats.scored++;
+    if (passes) stats.passed++;
     opportunities.push({
       sourceListing: listing,
       identity,
@@ -92,7 +153,9 @@ export async function runPipeline(
     });
   }
 
-  return opportunities.sort((a, b) => b.score - a.score);
+  stats.durationMs = Date.now() - t0;
+  log.info("pipeline: funnel", stats);
+  return { opportunities: opportunities.sort((a, b) => b.score - a.score), stats };
 }
 
 function median(xs: number[]): number {

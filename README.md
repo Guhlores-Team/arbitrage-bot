@@ -82,7 +82,26 @@ SerpApi. SerpApi scrapes server-side, so its **eBay engine returns eBay data
 (including SOLD prices)** without the 403 you hit scraping eBay directly. Tune
 with `SERPAPI_ENGINE` (`ebay` default, or `google_shopping`) and
 `SERPAPI_EBAY_SOLD` (`true` default = realized sold prices; `false` = active
-asks). Free tier is 100 searches/month.
+asks).
+
+**Watch your quota.** The free tier is capped (currently ~100–250 searches/mo
+depending on plan), and each comp lookup spends one. `npm run doctor` prints a
+live **SerpApi quota** line (left / used / total, with a ⚠ when nearly out),
+read straight from SerpApi's account endpoint — so you know before it bites.
+
+### Debug console
+
+```bash
+npm run debug                          # demo source, "nintendo switch"
+npm run debug -- "airpods pro" offerup 150   # query, source, price cap
+```
+
+Forces verbose logs and runs one real scan, then prints the **funnel** (how many
+listings dropped at each stage — priced out / no comps / asking ≥ median / no
+match), the **top opportunities** with flags, your **SerpApi quota**, and the
+**comp lookups this run cost**. The funnel tells you whether a dry scan died on
+price, comps, or matching. Set `DEBUG=1` (or `LOG_LEVEL=debug`) on any command
+(`npm run watch`, `npm run serve`) for the same per-listing logging.
 
 ## Deploy on a VM (always-on, one process)
 
