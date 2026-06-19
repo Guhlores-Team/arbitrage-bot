@@ -1,5 +1,5 @@
 import type { SoldComp } from "../types.js";
-import { estimateFees, estimateShipping, type FeeConfig } from "./fees.js";
+import { estimateFees, estimateShipping, categoryFees, type FeeConfig } from "./fees.js";
 
 /** Discount applied per condition rank the item sits BELOW its comps (tunable). */
 const CONDITION_STEP = clamp01(Number(process.env.CONDITION_STEP_PCT ?? 0.12));
@@ -75,6 +75,7 @@ export function computeMargin(
   category?: string,
   fees?: FeeConfig,
   conditionDelta = 0,
+  quantity = 1,
 ): Margin {
   const trimmed = trimOutliers(comps.map((c) => c.soldPrice));
   const discount = conditionDelta > 0 ? Math.max(0, 1 - conditionDelta * CONDITION_STEP) : 1;
@@ -84,22 +85,26 @@ export function computeMargin(
   const resaleLow = adj(percentile(trimmed, 0.25));
   const resaleMid = adj(rawMid);
   const resaleHigh = adj(percentile(trimmed, 0.75));
-  const ref = adj(percentile(trimmed, RESALE_PCT)); // conservative point for net
+  const ref = adj(percentile(trimmed, RESALE_PCT)); // conservative point for net (per item)
   const spread = resaleMid > 0 ? (resaleHigh - resaleLow) / resaleMid : 0;
 
-  const f = estimateFees(ref, fees);
-  const ship = estimateShipping(category);
-  const net = ref - f - ship - buyCost;
+  // Lots resell per item: value each unit (resale − fees − shipping), times the
+  // quantity, then subtract the single lot buy price. qty=1 = normal single item.
+  const qty = Math.max(1, Math.floor(quantity) || 1);
+  const cfg = fees ?? categoryFees(category);
+  const fPer = estimateFees(ref, cfg);
+  const shipPer = estimateShipping(category);
+  const net = (ref - fPer - shipPer) * qty - buyCost;
   return {
-    referencePrice: ref,
-    resaleLow,
-    resaleMid,
-    resaleHigh,
+    referencePrice: ref * qty,
+    resaleLow: resaleLow * qty,
+    resaleMid: resaleMid * qty,
+    resaleHigh: resaleHigh * qty,
     spread,
-    estimatedFees: f,
-    estimatedShipping: ship,
+    estimatedFees: fPer * qty,
+    estimatedShipping: shipPer * qty,
     netProfit: net,
-    marginPct: ref > 0 ? net / ref : 0,
+    marginPct: ref * qty > 0 ? net / (ref * qty) : 0,
     conditionDiscount: Math.round(rawMid) - resaleMid,
   };
 }

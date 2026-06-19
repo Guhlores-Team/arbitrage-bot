@@ -19,9 +19,24 @@ export function estimateFees(sellPrice: number, cfg: FeeConfig = DEFAULT_FEES): 
   return sellPrice * cfg.finalValuePct + cfg.perOrderFee + sellPrice * cfg.returnsReservePct;
 }
 
-/** Rough shipping estimate. Replace with category/weight lookup when you have it. */
+/** Category-adjusted fee config — eBay's final-value fee varies by category. */
+export function categoryFees(category?: string, base: FeeConfig = DEFAULT_FEES): FeeConfig {
+  const c = (category ?? "").toLowerCase();
+  const media = ["book", "textbook", "dvd", "blu-ray", "blu ray", "cd", "vinyl", "record", "movie"];
+  if (media.some((m) => c.includes(m))) return { ...base, finalValuePct: 0.1495 }; // media FVF is higher
+  return base;
+}
+
+/**
+ * Shipping estimate by category. Bulky goods are effectively freight/local-only
+ * (a high number correctly kills mail-resale margin); small goods ship cheap.
+ */
 export function estimateShipping(category?: string): number {
-  const heavy = ["furniture", "appliance", "tv", "monitor", "tool"];
-  if (category && heavy.some((h) => category.toLowerCase().includes(h))) return 25;
-  return 8;
+  const c = (category ?? "").toLowerCase();
+  const has = (arr: string[]) => arr.some((h) => c.includes(h));
+  if (has(["furniture", "couch", "sofa", "mattress", "appliance", "refrigerator", "washer", "dryer", "treadmill", "tv", "television", "peloton"])) return 45;
+  if (has(["console", "playstation", "xbox", "monitor", "speaker", "amplifier", "vacuum", "mixer", "printer", "guitar", "stroller"])) return 18;
+  if (has(["card", "game", "jewelry", "watch", "phone", "airpod", "earbud", "sunglass", "ring"])) return 5;
+  if (has(["book", "dvd", "blu", "vinyl", "record"])) return 4;
+  return 9;
 }

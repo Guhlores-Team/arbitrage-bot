@@ -31,10 +31,10 @@ test("estimateFees: final value + per-order + returns reserve", () => {
   assert.equal(f, expected);
 });
 
-test("estimateShipping: heavy categories cost more", () => {
-  assert.equal(estimateShipping("furniture"), 25);
-  assert.equal(estimateShipping("video games"), 8);
-  assert.equal(estimateShipping(undefined), 8);
+test("estimateShipping: bulky freight, small ships cheap, sane default", () => {
+  assert.equal(estimateShipping("furniture"), 45);
+  assert.equal(estimateShipping("video games"), 5);
+  assert.equal(estimateShipping(undefined), 9);
 });
 
 test("computeMargin: net = resale - fees - shipping - buy", () => {
@@ -43,9 +43,19 @@ test("computeMargin: net = resale - fees - shipping - buy", () => {
   assert.equal(m.referencePrice, 100);
   const fees = estimateFees(100);
   assert.equal(m.estimatedFees, fees);
-  assert.equal(m.estimatedShipping, 8);
-  assert.equal(m.netProfit, 100 - fees - 8 - 40);
+  assert.equal(m.estimatedShipping, 5);
+  assert.equal(m.netProfit, 100 - fees - 5 - 40);
   assert.ok(Math.abs(m.marginPct - m.netProfit / 100) < 1e-9);
+});
+
+test("computeMargin: a lot is valued as qty × per-item, minus one buy", () => {
+  const comps = [comp(20), comp(20), comp(20)]; // $20/item
+  const single = computeMargin(50, comps, "video games");
+  const lot = computeMargin(50, comps, "video games", undefined, 0, 20); // 20-game lot for $50
+  assert.equal(lot.referencePrice, single.referencePrice * 20);
+  const perItemNet = 20 - estimateFees(20) - 5;
+  assert.ok(Math.abs(lot.netProfit - (perItemNet * 20 - 50)) < 1e-9);
+  assert.ok(lot.netProfit > single.netProfit, "a 20-item lot should net more than a single item");
 });
 
 test("computeMargin: zero reference -> zero margin pct, no divide-by-zero", () => {

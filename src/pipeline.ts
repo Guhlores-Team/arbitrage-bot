@@ -151,8 +151,10 @@ export async function runPipelineDetailed(
     // typical condition gap between the comps and our item (signed median)
     const conditionDelta = median(verified.map((v) => v.verdict.conditionDelta));
 
-    // 4. fee-adjusted, condition-adjusted margin
-    const margin = computeMargin(listing.price, matchedComps, identity.category, undefined, conditionDelta);
+    // 4. fee-adjusted, condition-adjusted margin. Lots are valued as qty × per-item
+    //    (a "$5 — 20 games" bundle isn't a $5 single item).
+    const lot = detectLot(listing.rawTitle);
+    const margin = computeMargin(listing.price, matchedComps, identity.category, undefined, conditionDelta, lot.isLot ? lot.qty ?? 1 : 1);
 
     // 5. score
     const { score, passes, flags } = scoreOpportunity(
@@ -171,11 +173,9 @@ export async function runPipelineDetailed(
     if (comper.basis === "mock") flags.push("mock comps — not real resale data");
     if (margin.conditionDiscount > 0) flags.push(`condition discount −$${margin.conditionDiscount} vs comps`);
     if (margin.spread > 0.6) flags.push("wide price spread — resale uncertain");
-    // Lot/bundle guard: a single listing of many items is comped per-ITEM, so the
-    // auto-margin is misleading (e.g. "$5 — 20 games" isn't a $5 item). Flag it so
-    // the operator values it as qty × comp, not as one unit.
-    const lot = detectLot(listing.rawTitle);
-    if (lot.isLot) flags.push(`LOT${lot.qty ? ` ×${lot.qty}` : ""} — comps are per-item; value ≈ qty × comp`);
+    // Lot/bundle guard: flag it so the operator knows the value is qty × comp.
+    // When a quantity was parsed, the margin above already reflects qty × per-item.
+    if (lot.isLot) flags.push(lot.qty ? `LOT ×${lot.qty} — valued as ${lot.qty} × per-item comp` : "LOT — comps are per-item; value ≈ qty × comp");
 
     stats.scored++;
     if (passes) stats.passed++;
