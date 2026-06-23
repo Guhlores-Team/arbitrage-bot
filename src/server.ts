@@ -160,6 +160,10 @@ const server = createServer(async (req, res) => {
       const o = await store.setOpportunityOutcome(oppMatch[1], await readBody(req));
       return o ? json(res, 200, { opportunity: o }) : json(res, 404, { error: "not found" });
     }
+    if (oppMatch && method === "DELETE") {
+      const ok = await store.removeOpportunity(oppMatch[1]);
+      return json(res, ok ? 200 : 404, { ok });
+    }
 
     const draftMatch = path.match(/^\/api\/opportunities\/([\w-]+)\/draft$/);
     if (draftMatch && method === "POST") {

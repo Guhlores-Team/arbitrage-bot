@@ -53,7 +53,8 @@ export default function Hunt({
                 <div className="bacts">
                   <button className="bbtn atk" onClick={() => onAdvance(d.id, "bought")}>⚔ ATTACK</button>
                   <button className="bbtn loot" onClick={() => onAdvance(d.id, "sold")}>💰 LOOT</button>
-                  <button className="bbtn ghost" onClick={() => onEdit(d)}>✎</button>
+                  {d.url && <a className="bbtn ghost" href={d.url} target="_blank" rel="noopener" style={{ display: "flex", alignItems: "center", textDecoration: "none" }} title="View listing">↗</a>}
+                  <button className="bbtn ghost" onClick={() => onEdit(d)} title="Adjust / undo">✎</button>
                 </div>
               </div>
             );

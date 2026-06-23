@@ -37,6 +37,10 @@ export async function patchDeal(id: string, patch: OutcomePatch): Promise<void> 
   });
 }
 
+export async function deleteDeal(id: string): Promise<void> {
+  await fetch(`${API}/api/opportunities/${id}`, { method: "DELETE" });
+}
+
 /** Kick off a scan; resolves when the job finishes (or errors). */
 export async function runScan(query: string, source: string, onStatus?: (s: string) => void): Promise<void> {
   const j = await fetch(`${API}/api/search`, {

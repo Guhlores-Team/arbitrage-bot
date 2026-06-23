@@ -46,8 +46,8 @@ export interface Game {
 
 export interface OutcomePatch {
   status?: Stage;
-  boughtPrice?: number;
-  soldPrice?: number;
+  boughtPrice?: number | null;
+  soldPrice?: number | null; // null/empty clears it (undo a sale)
   notes?: string;
 }
 

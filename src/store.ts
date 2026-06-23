@@ -163,20 +163,31 @@ export class JsonStore {
   /** Record a buy/sell/skip outcome on a saved opportunity (the feedback loop). */
   async setOpportunityOutcome(
     id: string,
-    patch: { status?: string; boughtPrice?: number; soldPrice?: number; notes?: string },
+    patch: { status?: string; boughtPrice?: number | null; soldPrice?: number | null; notes?: string },
   ): Promise<OpportunityView | undefined> {
     await this.load();
     const o = this.data.opportunities.find((x) => x.id === id);
     if (!o) return undefined;
     if (patch.status) o.status = patch.status as OpportunityView["status"];
-    if (patch.boughtPrice != null) o.boughtPrice = Number(patch.boughtPrice);
-    if (patch.soldPrice != null) o.soldPrice = Number(patch.soldPrice);
+    // null/"" explicitly CLEARS a price (so an accidental sale can be undone).
+    if ("boughtPrice" in patch) o.boughtPrice = patch.boughtPrice == null || (patch.boughtPrice as any) === "" ? undefined : Number(patch.boughtPrice);
+    if ("soldPrice" in patch) o.soldPrice = patch.soldPrice == null || (patch.soldPrice as any) === "" ? undefined : Number(patch.soldPrice);
     if (patch.notes != null) o.notes = String(patch.notes);
-    // realized profit once we know both ends (sale minus what you paid)
-    if (o.soldPrice != null && o.boughtPrice != null) o.actualProfit = Math.round(o.soldPrice - o.boughtPrice);
+    // realized profit only when both ends are known; clear it if the sale is undone
+    o.actualProfit = o.soldPrice != null && o.boughtPrice != null ? Math.round(o.soldPrice - o.boughtPrice) : undefined;
     o.statusAt = new Date().toISOString();
     await this.flush();
     return o;
+  }
+
+  /** Remove a single saved opportunity (e.g. a mis-snapped or junk deal). */
+  async removeOpportunity(id: string): Promise<boolean> {
+    await this.load();
+    const before = this.data.opportunities.length;
+    this.data.opportunities = this.data.opportunities.filter((o) => o.id !== id);
+    const removed = this.data.opportunities.length < before;
+    if (removed) await this.flush();
+    return removed;
   }
 
   /** Create a deal by hand (e.g. snap-capture a thrift find from a phone photo). */

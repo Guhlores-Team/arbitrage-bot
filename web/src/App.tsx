@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Deal, Game, OutcomePatch, Stage, View, SourceHealth, ClassId } from "./types";
-import { fetchDeals, patchDeal, runScan, fetchGame, saveGame, fetchHealth, createManual, createWatchlist } from "./api";
+import { fetchDeals, patchDeal, deleteDeal, runScan, fetchGame, saveGame, fetchHealth, createManual, createWatchlist } from "./api";
 import { downscale } from "./img";
 import { dealNet, dealRoi, conf } from "./lib";
 import { computeHero, computeQuests, computeBoss, buffsFrom, relicsOwned, RELIC_SLOTS, SKILLS } from "./progression";
@@ -91,6 +91,12 @@ export default function App() {
     setEditing(null); flash("Saved"); await load();
   }, [editing, flash, load, muted]);
 
+  const removeDeal = useCallback(async () => {
+    if (!editing) return;
+    await deleteDeal(editing.id);
+    setEditing(null); flash("Deal removed"); await load();
+  }, [editing, flash, load]);
+
   const scan = useCallback(async () => {
     const query = prompt("Explore — search query?", "nintendo switch");
     if (!query) return;
@@ -161,7 +167,7 @@ export default function App() {
         </div>
       </main>
       <input ref={snapRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={onSnapFile} />
-      {editing && <DealEditor deal={editing} onSave={saveEdit} onClose={() => setEditing(null)} />}
+      {editing && <DealEditor deal={editing} onSave={saveEdit} onClose={() => setEditing(null)} onDelete={removeDeal} />}
       <CoinBurst trigger={burst} />
       {toast && <div className="toast">{toast}</div>}
     </div>
