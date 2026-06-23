@@ -1,7 +1,11 @@
 # DESLOPPIFY — cleanup backlog
 
-A prioritized review of tech debt accrued during rapid build-out. **No code has
-been changed** by this review. Pick an item by ID; we fix one at a time.
+A prioritized review of tech debt accrued during rapid build-out.
+
+## Status (updated)
+**Done:** C1 ✅ · M1 ✅ · M2 ✅ · M3 ✅ · M4 ✅ · M5 ✅ · M6 ✅ · M7 ✅ · M8 ✅ · M9 ✅ · M10 ✅ · N1 ✅ · N4 ✅
+**Deferred by design:** N2 (inline-style migration — do incrementally) · N3 (JSON→DB — only when you outgrow single-process).
+Details for each remain below for reference.
 
 Legend — **Safe now**: low blast radius, do anytime · **Coordinate**: touches
 shared/behavioral code, do deliberately with tests.
