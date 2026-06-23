@@ -23,6 +23,12 @@ jobs:
       - name: Run backend tests
         run: npm test
 
+      - name: Install web dependencies
+        run: cd web && npm install
+
+      - name: Run web tests
+        run: cd web && npm test
+
       - name: Build web app
         run: npm run build:web
 

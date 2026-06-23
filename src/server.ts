@@ -54,6 +54,22 @@ const server = createServer(async (req, res) => {
     const path = url.pathname;
     const method = req.method ?? "GET";
 
+    // Optional auth gate (default OFF). Set DASHBOARD_TOKEN before exposing the
+    // dashboard beyond a private tailnet. ?token=… unlocks via a 1-year cookie.
+    const TOKEN = process.env.DASHBOARD_TOKEN;
+    if (TOKEN) {
+      const cookie = (req.headers.cookie ?? "").match(/(?:^|;\s*)lq_token=([^;]+)/)?.[1];
+      const hdr = req.headers["x-dashboard-token"];
+      if (url.searchParams.get("token") === TOKEN) {
+        res.writeHead(302, { "Set-Cookie": `lq_token=${TOKEN}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax`, Location: path });
+        return res.end();
+      }
+      if (cookie !== TOKEN && hdr !== TOKEN) {
+        res.writeHead(401, { "Content-Type": "text/html" });
+        return res.end('<body style="font-family:sans-serif;background:#171219;color:#efe4cf;padding:40px"><h2>🔒 Locked</h2><p>Append <code>?token=YOUR_TOKEN</code> to the URL to unlock.</p></body>');
+      }
+    }
+
     if (method === "GET" && path === "/api/config") {
       const llm = llmInfo();
       return json(res, 200, {
@@ -77,7 +93,12 @@ const server = createServer(async (req, res) => {
     }
 
     if (path === "/api/settings") {
-      if (method === "GET") return json(res, 200, { settings: getSettings(), compMarkets: COMP_MARKETS, sources: SOURCES });
+      if (method === "GET") {
+        // Surface the effective defaults (THRESHOLDS = single source of truth) so
+        // the UI never has to hardcode its own threshold numbers.
+        const s = getSettings();
+        return json(res, 200, { settings: { ...s, thresholds: s.thresholds ?? THRESHOLDS }, compMarkets: COMP_MARKETS, sources: SOURCES });
+      }
       if (method === "PUT" || method === "POST") {
         const body = await readBody(req);
         const patch: any = {};

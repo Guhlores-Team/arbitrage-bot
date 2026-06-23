@@ -233,11 +233,12 @@ function avg(xs: number[]): number {
  */
 export function detectLot(title: string): { isLot: boolean; qty?: number } {
   const t = title.toLowerCase();
-  const keyword = /\b(lot|bundle|bulk|wholesale|job\s?lot)\b/.test(t);
+  const keyword = /\b(lot|bundle|bulk|wholesale|job\s?lot|pack)\b/.test(t);
   const UNIT = /\b(games?|cards?|items?|pcs|pieces?|books?|figures?|comics?|movies?|dvds?|cds?|records?|vinyls?)\b/;
   let qty: number | undefined;
   const explicit =
-    t.match(/\b(?:lot|bundle|set)\s+(?:of\s+)?(\d{1,3})\b/) ||
+    t.match(/\b(?:lot|bundle|set|pack)\s+(?:of\s+)?(\d{1,3})\b/) ||
+    t.match(/\b(?:qty|quantity)\s*:?\s*(\d{1,3})\b/) ||
     t.match(/\((\d{1,3})\)/) ||
     t.match(/\bx\s?(\d{1,3})\b/);
   const leading = t.match(/^\s*(\d{1,3})\s+[a-z]/);
