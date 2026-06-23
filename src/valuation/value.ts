@@ -1,5 +1,6 @@
 import type { SoldComp } from "../types.js";
 import { estimateFees, estimateShipping, categoryFees, type FeeConfig } from "./fees.js";
+import { median } from "../stats.js";
 
 /** Discount applied per condition rank the item sits BELOW its comps (tunable). */
 const CONDITION_STEP = clamp01(Number(process.env.CONDITION_STEP_PCT ?? 0.12));
@@ -21,13 +22,6 @@ export function percentile(xs: number[], p: number): number {
   const s = [...xs].sort((a, b) => a - b);
   const idx = Math.round((s.length - 1) * Math.max(0, Math.min(1, p)));
   return s[idx];
-}
-
-function median(xs: number[]): number {
-  if (!xs.length) return 0;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
 /** Median sold price across matched comps, after trimming outliers. */

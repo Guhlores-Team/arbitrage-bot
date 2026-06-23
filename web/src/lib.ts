@@ -32,9 +32,11 @@ export function money(n: number): string {
   return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString();
 }
 
-/** Realized profit if sold, else fee-adjusted projected net. */
+/** Realized if sold; otherwise the ENGINE's net (per-category fees + shipping,
+ *  lot-aware). Only fall back to a flat estimate if the engine gave no net yet. */
 export function dealNet(d: Deal): number {
   if (d.status === "sold" && d.actualProfit != null) return d.actualProfit;
+  if (d.net != null) return Math.round(d.net);
   const buy = d.boughtPrice ?? d.buy ?? 0;
   return Math.round((d.soldPrice ?? d.resale ?? 0) * (1 - FEE) - buy);
 }

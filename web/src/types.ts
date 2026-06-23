@@ -20,6 +20,7 @@ export interface Deal {
   boughtPrice?: number;
   soldPrice?: number;
   actualProfit?: number;
+  statusAt?: string;
   notes?: string;
   flags?: string[];
 }

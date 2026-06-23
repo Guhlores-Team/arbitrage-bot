@@ -3,6 +3,7 @@ import { identifyProduct } from "./extraction/identify.js";
 import { verifyMatches } from "./matching/match.js";
 import { computeMargin } from "./valuation/value.js";
 import { scoreOpportunity, THRESHOLDS, type Thresholds } from "./scoring/score.js";
+import { median } from "./stats.js";
 import { log } from "./log.js";
 import type { Opportunity, MarketStat, SoldComp } from "./types.js";
 
@@ -221,12 +222,6 @@ async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<v
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
-function median(xs: number[]): number {
-  if (!xs.length) return 0;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
 function avg(xs: number[]): number {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
 }

@@ -8,17 +8,19 @@ Apify Store to monetize** (rental or pay-per-result).
 
 | Actor | Status | Role |
 |-------|--------|------|
-| `facebook-marketplace/` | ✅ ready to deploy | BUY source |
-| `ebay-sold/` | ✅ ready to deploy | COMP source (real sold prices) |
-| `offerup/` | ✅ ready to deploy | BUY source |
-| `mercari/` | ✅ ready to deploy | BUY source |
-| `craigslist/` | ✅ ready to deploy | BUY source (residential proxy beats IP blocks) |
-| `ebay/` | ✅ ready to deploy | BUY source (active listings) |
-| `stockx/` | ✅ ready to deploy | COMP source (sneakers — turns StockX real) |
-| `poshmark/` | ✅ ready to deploy | BUY + COMP (fashion; sold=comps) |
-| `depop/` | ✅ ready to deploy | BUY source (fashion/vintage) |
-| `nextdoor/` | ✅ ready to deploy | BUY source (hyperlocal; needs cookies) |
-| `auctions-hibid/` | ✅ ready to deploy | BUY source (estate/liquidation lots) |
+| `facebook-marketplace/` | ⚠️ blocked / needs work | BUY source |
+| `ebay-sold/` | ⚠️ blocked / needs work | COMP source (real sold prices) |
+| `offerup/` | ✅ working (verified) | BUY source |
+| `mercari/` | ✅ working (verified) | BUY source |
+| `craigslist/` | ⚠️ blocked / needs work | BUY source (residential proxy beats IP blocks) |
+| `ebay/` | ⚠️ blocked / needs work | BUY source (active listings) |
+| `stockx/` | ✅ working (verified) | COMP source (sneakers — turns StockX real) |
+| `poshmark/` | ✅ working (verified) | BUY + COMP (fashion; sold=comps) |
+| `depop/` | ⚠️ blocked / needs work | BUY source (fashion/vintage) |
+| `nextdoor/` | ⚠️ blocked / needs work | BUY source (hyperlocal; needs cookies) |
+| `auctions-hibid/` | ✅ working (verified) | BUY source (estate/liquidation lots) |
+
+Status from `npm run doctor:actors`; blocked actors are anti-bot/cookie issues, not code bugs — see DESLOPPIFY.md M9.
 
 > The fashion/sneaker/local/auction actors use **best-effort selectors** — they
 > follow each site's current markup and may need a tweak in `extractCards()` after

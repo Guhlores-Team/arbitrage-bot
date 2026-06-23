@@ -104,7 +104,7 @@ export default function WarTable({ onToast }: { onToast: (m: string) => void }) 
         <button className="tbtn" onClick={async () => {
           const keywords = sw.keywords.split(",").map((k) => k.trim()).filter(Boolean);
           if (!keywords.length) return onToast("Enter keywords");
-          await createSweep({ label: sw.label || "Sweep", keywords, source: sw.source, intervalMin: sw.intervalMin, perTick: sw.perTick, thresholds: th } as any);
+          await createSweep({ label: sw.label || "Sweep", keywords, source: sw.source, intervalMin: sw.intervalMin, perTick: sw.perTick, thresholds: th });
           setSw({ ...sw, label: "", keywords: "" }); onToast("Sweep added"); reload();
         }}>Add</button>
       </div>

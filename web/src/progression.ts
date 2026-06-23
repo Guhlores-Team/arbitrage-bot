@@ -97,7 +97,7 @@ export function computeBoss(deals: Deal[], bossMult: number): Boss {
   const wk = startOfWeek();
   const soldCount = deals.filter((d) => d.status === "sold").length;
   const weekNet = deals
-    .filter((d) => d.status === "sold" && new Date((d as any).statusAt ?? 0).getTime() >= wk)
+    .filter((d) => d.status === "sold" && new Date(d.statusAt ?? 0).getTime() >= wk)
     .reduce((a, d) => a + dealNet(d), 0);
   const level = 1 + Math.floor(soldCount / 5);
   const maxHp = 500 + 100 * Math.floor(soldCount / 5);
@@ -111,7 +111,7 @@ export interface Quest { id: string; key: string; label: string; progress: numbe
 function today(): string { return new Date().toISOString().slice(0, 10); }
 function isToday(iso?: string): boolean { return !!iso && iso.slice(0, 10) === today(); }
 export function computeQuests(deals: Deal[], claimed: string[]): Quest[] {
-  const soldToday = deals.filter((d) => d.status === "sold" && isToday((d as any).statusAt));
+  const soldToday = deals.filter((d) => d.status === "sold" && isToday(d.statusAt));
   const banked = soldToday.reduce((a, d) => a + dealNet(d), 0);
   const legendaries = soldToday.filter((d) => dealNet(d) >= 100).length;
   const defs = [

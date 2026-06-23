@@ -13,6 +13,14 @@ export function percentile(sorted: number[], p: number): number {
   return sorted[idx];
 }
 
+/** Median of an unsorted array (0 for empty). The one true median impl. */
+export function median(xs: number[]): number {
+  if (!xs.length) return 0;
+  const s = asc(xs);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
 /** Round to a step (e.g. 0.05, 5) without binary-float noise. */
 export const round = (n: number, step: number): number => Number((Math.round(n / step) * step).toFixed(4));
 

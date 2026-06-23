@@ -50,9 +50,12 @@ export async function runScan(query: string, source: string, onStatus?: (s: stri
   })
     .then((r) => r.json())
     .catch(() => null);
-  if (!j?.id) return;
+  if (!j?.id) { onStatus?.("error"); return; }
   await new Promise<void>((resolve) => {
+    let tries = 0;
+    const MAX = 80; // ~3.3 min at 2.5s — give up rather than poll forever
     const poll = setInterval(async () => {
+      if (++tries > MAX) { clearInterval(poll); onStatus?.("error"); resolve(); return; }
       const s = await fetch(`${API}/api/search/${j.id}`).then((r) => r.json()).catch(() => null);
       if (s && (s.status === "done" || s.status === "error")) {
         clearInterval(poll);
@@ -81,7 +84,7 @@ export const deleteWatchlist = (id: string) => fetch(`${API}/api/watchlists/${id
 export const runWatchlist = (id: string) => jsend(`/api/watchlists/${id}/run`, "POST");
 
 export async function fetchSweeps(): Promise<Sweep[]> { return (await jget("/api/sweeps")).sweeps ?? []; }
-export const createSweep = (b: Partial<Sweep>) => jsend("/api/sweeps", "POST", b);
+export const createSweep = (b: Partial<Sweep> & { thresholds?: unknown }) => jsend("/api/sweeps", "POST", b);
 export const toggleSweep = (id: string, enabled: boolean) => jsend(`/api/sweeps/${id}`, "PATCH", { enabled });
 export const deleteSweep = (id: string) => fetch(`${API}/api/sweeps/${id}`, { method: "DELETE" });
 export const runSweep = (id: string) => jsend(`/api/sweeps/${id}/run`, "POST");
