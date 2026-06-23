@@ -4,7 +4,13 @@ A prioritized review of tech debt accrued during rapid build-out.
 
 ## Status (updated)
 **Done:** C1 ✅ · M1 ✅ · M2 ✅ · M3 ✅ · M4 ✅ · M5 ✅ · M6 ✅ · M7 ✅ · M8 ✅ · M9 ✅ · M10 ✅ · N1 ✅ · N4 ✅
-**Deferred by design:** N2 (inline-style migration — do incrementally) · N3 (JSON→DB — only when you outgrow single-process).
+**N2 — partially done ✅:** deduped the repeated `iconMask()` helper (real DRY debt).
+The remaining inline→CSS migration is left incremental (component-specific, no
+functional debt).
+**N3 — intentionally NOT done:** JSON→SQLite/Prisma is premature for a
+single-process app and would add migration/concurrency complexity for zero
+current benefit. Trigger to revisit: multiple processes writing the store, write
+contention, or store.json growing unwieldy (big snap images).
 Details for each remain below for reference.
 
 Legend — **Safe now**: low blast radius, do anytime · **Coordinate**: touches
