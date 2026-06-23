@@ -1,8 +1,5 @@
 import { RELICS, RELIC_SLOTS } from "../progression";
-
-function mask(name: string) {
-  return { WebkitMaskImage: `url(/art/gi/${name}.svg)`, maskImage: `url(/art/gi/${name}.svg)`, WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat", WebkitMaskPosition: "center", maskPosition: "center" } as const;
-}
+import { iconMask } from "../lib";
 
 export default function Hoard({
   owned, equipped, onToggle,
@@ -21,7 +18,7 @@ export default function Hoard({
           const on = equipped.includes(r.id);
           return (
             <div className="beast" key={r.id} style={{ borderColor: on ? "var(--gold)" : "var(--line2)", opacity: have ? 1 : 0.45 }}>
-              <div className="tile" style={{ ...mask(r.icon), background: on ? "var(--gold)" : have ? "var(--cyan)" : "var(--muted)" }} />
+              <div className="tile" style={{ ...iconMask(r.icon), background: on ? "var(--gold)" : have ? "var(--cyan)" : "var(--muted)" }} />
               <div className="bt" style={{ fontSize: 18 }}>{r.name}</div>
               <div className="bs">{r.desc}{have ? "" : " · locked"}</div>
               <div className="bacts" style={{ clear: "both", marginTop: 14 }}>

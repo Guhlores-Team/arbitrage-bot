@@ -1,9 +1,6 @@
 import type { ClassId } from "../types";
 import { CLASSES, SKILLS } from "../progression";
-
-function mask(name: string) {
-  return { WebkitMaskImage: `url(/art/gi/${name}.svg)`, maskImage: `url(/art/gi/${name}.svg)`, WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat", WebkitMaskPosition: "center", maskPosition: "center" } as const;
-}
+import { iconMask } from "../lib";
 
 export default function ClassView({
   current, onPick, skills, availableSP, onUnlock,
@@ -23,7 +20,7 @@ export default function ClassView({
           const c = CLASSES[id], on = current === id;
           return (
             <div className="beast" key={id} style={{ borderColor: on ? "var(--gold)" : "var(--line2)", boxShadow: on ? "0 0 30px #e9c66b33" : "none" }}>
-              <div className="tile" style={{ ...mask(c.icon), background: on ? "var(--gold)" : "var(--muted2)" }} />
+              <div className="tile" style={{ ...iconMask(c.icon), background: on ? "var(--gold)" : "var(--muted2)" }} />
               <div className="bt" style={{ fontSize: 20 }}>{c.name}</div>
               <div className="bs">{c.perk}</div>
               <div className="bacts" style={{ clear: "both", marginTop: 14 }}>

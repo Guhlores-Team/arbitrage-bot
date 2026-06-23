@@ -1,11 +1,7 @@
 import type { Game, View } from "../types";
 import type { Hero } from "../progression";
 import { CLASSES } from "../progression";
-import { money } from "../lib";
-
-function mask(name: string) {
-  return { WebkitMaskImage: `url(/art/gi/${name}.svg)`, maskImage: `url(/art/gi/${name}.svg)` } as const;
-}
+import { money, iconMask as mask } from "../lib";
 
 const NAV: { icon: string; label: string; view?: View }[] = [
   { icon: "scroll-unfurled", label: "Ledger", view: "ledger" },

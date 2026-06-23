@@ -1,4 +1,5 @@
 import type { SourceHealth } from "../types";
+import { iconMask } from "../lib";
 
 // Marketplace zones. Maps real connector health to RPG "realms". A realm is
 // LIVE when its connector is ready; selecting it filters The Hunt to that source.
@@ -33,7 +34,7 @@ export default function Realms({
           return (
             <div key={r.source} className="beast" style={{ borderColor: active === r.source ? "var(--gold)" : "var(--line2)", cursor: "pointer" }}
               onClick={() => onPick(r.source)}>
-              <div className="tile mask" style={{ background: col, WebkitMaskImage: `url(/art/gi/${r.icon}.svg)`, maskImage: `url(/art/gi/${r.icon}.svg)`, WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat", WebkitMaskPosition: "center", maskPosition: "center" }} />
+              <div className="tile" style={{ background: col, ...iconMask(r.icon) }} />
               <div className="bt" style={{ fontSize: 18 }}>{r.name}</div>
               <div className="bs">
                 <span className="pill" style={{ color: col, background: col + "22" }}>{live ? "LIVE" : "NEEDS SETUP"}</span>

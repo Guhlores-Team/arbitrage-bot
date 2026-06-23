@@ -1,4 +1,16 @@
+import type { CSSProperties } from "react";
 import type { Deal, Stage } from "./types";
+
+/** CSS mask style for a recolorable SVG icon (game-icons/twemoji/phosphor). */
+export function iconMask(name: string, dir: "gi" | "tw" | "ph" = "gi"): CSSProperties {
+  const u = `url(/art/${dir}/${name}.svg)`;
+  return {
+    WebkitMaskImage: u, maskImage: u,
+    WebkitMaskSize: "contain", maskSize: "contain",
+    WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat",
+    WebkitMaskPosition: "center", maskPosition: "center",
+  };
+}
 
 export const FEE = 0.18; // resale fee assumption for projected net
 
