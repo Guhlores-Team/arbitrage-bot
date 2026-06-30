@@ -1,14 +1,13 @@
 import { Actor } from "apify";
-import { CheerioCrawler, log } from "crawlee";
+import { PlaywrightCrawler, log } from "crawlee";
 
 /**
  * eBay Sold Listings Scraper (Apify actor).
  *
  * Pulls eBay's SOLD / completed search results — the real realized prices that
- * make a resale comp trustworthy. eBay search pages are server-rendered HTML, so
- * we fetch over plain HTTP with browser-like headers (CheerioCrawler) behind a
- * US residential proxy. No browser to launch means it's cheap and fast, and a
- * plain request often sidesteps the headless-Chromium bot challenge.
+ * make a resale comp trustworthy. eBay now serves a bot challenge to plain HTTP
+ * requests, so we drive a real headless browser (PlaywrightCrawler) behind a US
+ * residential proxy and reuse the same cheerio extraction via parseWithCheerio.
  *
  * Input:  { query, maxItems, condition, maxPrice, proxyConfiguration }
  * Output: { id, title, price, currency, condition, soldAt, url, image, market }
@@ -35,12 +34,20 @@ if (condition === "new") params.set("LH_ItemCondition", "1000");
 if (condition === "used") params.set("LH_ItemCondition", "3000");
 const startUrl = `https://www.ebay.com/sch/i.html?${params.toString()}`;
 
-const crawler = new CheerioCrawler({
+const crawler = new PlaywrightCrawler({
   proxyConfiguration,
   maxRequestsPerCrawl: 1,
   maxRequestRetries: 2,
-  requestHandlerTimeoutSecs: 60,
-  requestHandler: async ({ $, body }) => {
+  navigationTimeoutSecs: 60,
+  requestHandlerTimeoutSecs: 120,
+  launchContext: { launchOptions: { args: ["--disable-blink-features=AutomationControlled"] } },
+  requestHandler: async ({ page, parseWithCheerio }) => {
+    // Wait for the rendered sold cards (a real browser passes the challenge a
+    // plain HTTP request can't), then reuse the cheerio extraction unchanged.
+    await page.waitForSelector("li.s-item, a[href*='/itm/']", { timeout: 30_000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const $ = await parseWithCheerio();
+
     const out = extractItems($)
       .map(parseItem)
       .filter((c) => c.title && c.price > 0 && !/^shop on ebay$/i.test(c.title))
@@ -48,16 +55,14 @@ const crawler = new CheerioCrawler({
       .slice(0, maxItems);
 
     if (!out.length) {
-      log.warning(`0 sold comps — page title "${$("title").text().trim()}" (len=${(body || "").length}; challenge?).`);
+      log.warning(`0 sold comps — page title "${await page.title()}" (challenge or markup change?).`);
     }
     log.info(`Scraped ${out.length} sold comps for "${query}".`);
     await Actor.pushData(out);
   },
 });
 
-// Let got-scraping generate a full, consistent browser fingerprint (UA +
-// sec-ch-ua + TLS); partial manual headers tripped eBay's 403. Retries rotate
-// to fresh residential IPs, since eBay blocks are often per-IP.
+// Retries rotate to fresh residential IPs, since eBay blocks are often per-IP.
 await crawler.run([startUrl]);
 await Actor.exit();
 

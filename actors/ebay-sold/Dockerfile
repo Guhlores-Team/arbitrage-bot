@@ -1,6 +1,6 @@
-# Lightweight Node base — eBay results are server-rendered HTML, so we fetch over
-# HTTP (CheerioCrawler) with browser-like headers. No browser = far cheaper/faster.
-FROM apify/actor-node:20
+# Playwright base — eBay now serves a bot challenge to plain HTTP requests, so a
+# real browser is required to reach the rendered sold-listing markup.
+FROM apify/actor-node-playwright-chrome:20
 
 COPY package.json ./
 RUN npm install --omit=dev --omit=optional --no-audit --no-fund \
