@@ -1,9 +1,34 @@
 import type { SoldComp } from "../types.js";
 import type { CompConnector } from "./connector.js";
+import { loadJson, saveJson } from "./persist.js";
 import { log } from "../log.js";
 
 /** Live SerpApi searches made by this process (each costs one search credit). */
 let liveSearches = 0;
+
+// Persistent per-DAY counter (survives restarts, unlike liveSearches). Only
+// touched when SERPAPI_DAILY_MAX is set, so default runs do zero file I/O.
+const USAGE_FILE = process.env.SERPAPI_USAGE_FILE ?? ".cache/serpapi-usage.json";
+let daily: { date: string; count: number } | undefined;
+const today = (): string => new Date().toISOString().slice(0, 10);
+function loadDaily(): { date: string; count: number } {
+  if (!daily) daily = loadJson(USAGE_FILE, { date: today(), count: 0 });
+  if (daily.date !== today()) daily = { date: today(), count: 0 }; // new day → reset
+  return daily;
+}
+/** Searches spent today against SERPAPI_DAILY_MAX (0 when the cap is off). */
+export function serpApiDailyCount(): number {
+  return Number(process.env.SERPAPI_DAILY_MAX ?? 0) > 0 ? loadDaily().count : 0;
+}
+/** One live search happened: bump the per-run counter, and the daily one if capped. */
+function recordSearch(): void {
+  liveSearches++;
+  if (Number(process.env.SERPAPI_DAILY_MAX ?? 0) > 0) {
+    const d = loadDaily();
+    d.count++;
+    saveJson(USAGE_FILE, d);
+  }
+}
 // Budget state: undefined = not yet checked, null = unknown (don't guard).
 let budget: { left: number } | null | undefined;
 let warnedBudget = false; // warn once per run, not once per skipped listing
@@ -42,6 +67,9 @@ function noteBudgetSkip(): void {
  * The monthly figure is read once per run from the (free) account endpoint.
  */
 async function budgetExhausted(key: string): Promise<boolean> {
+  const dailyMax = Math.max(0, Number(process.env.SERPAPI_DAILY_MAX ?? 0));
+  if (dailyMax && loadDaily().count >= dailyMax) return true; // hard daily cap (persisted)
+
   const maxPerRun = Math.max(0, Number(process.env.SERPAPI_MAX_PER_RUN ?? 0));
   if (maxPerRun && liveSearches >= maxPerRun) return true;
 
@@ -137,7 +165,7 @@ export class SerpApiShoppingConnector implements CompConnector {
       noteBudgetSkip();
       return [];
     }
-    liveSearches++;
+    recordSearch();
     const res = await fetch("https://serpapi.com/search.json?" + params);
     if (!res.ok) throw new Error(`serpapi ebay ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const json: any = await res.json();
@@ -164,7 +192,7 @@ export class SerpApiShoppingConnector implements CompConnector {
       noteBudgetSkip();
       return [];
     }
-    liveSearches++;
+    recordSearch();
     const res = await fetch(url);
     if (!res.ok) throw new Error(`serpapi ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const json: any = await res.json();

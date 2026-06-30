@@ -82,7 +82,8 @@ export function buildComper(): CompConnector {
   }
 
   const ttlMin = Number(process.env.COMP_CACHE_TTL_MIN ?? 720);
-  return ttlMin > 0 ? new CachingCompConnector(comper, ttlMin * 60_000) : comper;
+  const persistPath = process.env.COMP_CACHE_FILE?.trim() || undefined;
+  return ttlMin > 0 ? new CachingCompConnector(comper, ttlMin * 60_000, persistPath) : comper;
 }
 
 /** Human-readable description of the active comp market(s), for health/UI. */

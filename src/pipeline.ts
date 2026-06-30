@@ -121,6 +121,16 @@ export async function runPipelineDetailed(
       return;
     }
 
+    // 1b. price-band pre-filter: don't spend a scarce paid comp search on a
+    // listing outside your buying range (config-gated; default off).
+    const minPrice = Number(process.env.PREFILTER_MIN_PRICE ?? 0);
+    const maxPrice = Number(process.env.PREFILTER_MAX_PRICE ?? 0);
+    if ((minPrice > 0 && listing.price < minPrice) || (maxPrice > 0 && listing.price > maxPrice)) {
+      stats.pricedOut++;
+      log.debug("skip: outside price band (comp prefilter)", { id: listing.id, price: listing.price, minPrice, maxPrice });
+      return;
+    }
+
     // 2. pull sold comps from the sell market (the paid call — count it)
     stats.compLookups++;
     const rawComps = (await comper.getSoldComps(identity.searchString, 20)).filter(
