@@ -37,10 +37,26 @@ const startUrl = `https://www.ebay.com/sch/i.html?${params.toString()}`;
 const crawler = new PlaywrightCrawler({
   proxyConfiguration,
   maxRequestsPerCrawl: 1,
-  maxRequestRetries: 2,
+  maxRequestRetries: 5,
   navigationTimeoutSecs: 60,
-  requestHandlerTimeoutSecs: 120,
+  requestHandlerTimeoutSecs: 150,
+  sessionPoolOptions: { maxPoolSize: 100 },
   launchContext: { launchOptions: { args: ["--disable-blink-features=AutomationControlled"] } },
+  // eBay 403s a cold request to the sold-search URL. Warm a session on the
+  // homepage first so the search carries real eBay cookies; each retry rotates
+  // to a fresh residential IP + session and re-warms.
+  preNavigationHooks: [
+    async ({ page }, gotoOptions) => {
+      await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
+      try {
+        await page.goto("https://www.ebay.com/", { waitUntil: "domcontentloaded", timeout: 30_000 });
+        await page.waitForTimeout(1200 + Math.random() * 1500);
+      } catch {
+        /* warmup is best-effort — proceed to the search either way */
+      }
+      if (gotoOptions) gotoOptions.waitUntil = "domcontentloaded";
+    },
+  ],
   requestHandler: async ({ page, parseWithCheerio }) => {
     // Wait for the rendered sold cards (a real browser passes the challenge a
     // plain HTTP request can't), then reuse the cheerio extraction unchanged.
