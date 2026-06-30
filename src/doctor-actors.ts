@@ -38,7 +38,9 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 async function probeActor(token: string, a: (typeof ACTORS)[number]): Promise<string> {
-  const url = `https://api.apify.com/v2/acts/${a.actor}/run-sync-get-dataset-items?token=${token}&timeout=140`;
+  // Force 4 GB so the Playwright/Chromium actors can launch regardless of the
+  // actor's saved default (a leftover low memory from a Cheerio build = 0 items).
+  const url = `https://api.apify.com/v2/acts/${a.actor}/run-sync-get-dataset-items?token=${token}&timeout=140&memory=4096`;
   try {
     const res = await withTimeout(
       fetch(url, {

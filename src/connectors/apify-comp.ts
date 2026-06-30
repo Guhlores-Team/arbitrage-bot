@@ -61,7 +61,8 @@ export class ApifyCompConnector implements CompConnector {
     const base = this.cfg.taskId
       ? `https://api.apify.com/v2/actor-tasks/${this.cfg.taskId}`
       : `https://api.apify.com/v2/acts/${this.cfg.actor!.replace("/", "~")}`;
-    const url = `${base}/run-sync-get-dataset-items?token=${this.cfg.token}&timeout=180`;
+    const mem = Number(process.env.APIFY_MEMORY_MB ?? 4096); // Playwright actors need room to launch Chromium
+    const url = `${base}/run-sync-get-dataset-items?token=${this.cfg.token}&timeout=180&memory=${mem}`;
 
     const input = { [this.cfg.queryField!]: searchString, maxItems: limit, ...(this.cfg.input ?? {}) };
     const res = await fetch(url, {
