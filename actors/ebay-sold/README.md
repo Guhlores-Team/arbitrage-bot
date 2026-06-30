@@ -44,4 +44,4 @@ Each sold listing as a dataset item:
 
 - Use **residential proxy** — datacenter IPs get throttled by eBay search.
 - `maxItems` controls cost: each run is one page load; 20–60 comps is plenty for a median.
-- Pair with the [Arbitrage Engine](https://github.com/) as its comp source (see repo `actors/README.md`).
+- Pair with the [Arbitrage Engine](https://github.com/guhlores-team/arbitrage-bot) as its comp source (see repo `actors/README.md`).

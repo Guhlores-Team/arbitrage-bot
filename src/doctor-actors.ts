@@ -17,18 +17,25 @@ import "./env.js";
 const PER_ACTOR_TIMEOUT_MS = 150_000;
 const MAX_ITEMS = 5;
 
+/**
+ * Apify account that owns the deployed actors. Override with APIFY_ACTOR_OWNER
+ * when the actors live under a different account (e.g. a team), so the org move
+ * doesn't require editing the actor names below.
+ */
+const OWNER = process.env.APIFY_ACTOR_OWNER || "Guhlore";
+
 /** Deployed actors, with a query that should return results for each. */
 const ACTORS: { name: string; actor: string; query: string; note?: string }[] = [
-  { name: "ebay-sold", actor: "Guhlore~ebay-sold-listings-scraper", query: "nintendo switch oled" },
-  { name: "stockx", actor: "Guhlore~stockx-scraper", query: "jordan 1" },
-  { name: "poshmark", actor: "Guhlore~poshmark-scraper", query: "lululemon define jacket" },
-  { name: "depop", actor: "Guhlore~depop-scraper", query: "carhartt jacket" },
-  { name: "mercari", actor: "Guhlore~mercari-scraper", query: "nintendo switch" },
-  { name: "offerup", actor: "Guhlore~offerup-scraper", query: "nintendo switch" },
-  { name: "craigslist", actor: "Guhlore~craigslist-scraper", query: "nintendo switch" },
-  { name: "ebay", actor: "Guhlore~ebay-scraper", query: "nintendo switch" },
-  { name: "hibid", actor: "Guhlore~hibid-auction-scraper", query: "macbook" },
-  { name: "nextdoor", actor: "Guhlore~nextdoor-scraper", query: "free", note: "needs logged-in cookies — expect 0 without them" },
+  { name: "ebay-sold", actor: `${OWNER}~ebay-sold-listings-scraper`, query: "nintendo switch oled" },
+  { name: "stockx", actor: `${OWNER}~stockx-scraper`, query: "jordan 1" },
+  { name: "poshmark", actor: `${OWNER}~poshmark-scraper`, query: "lululemon define jacket" },
+  { name: "depop", actor: `${OWNER}~depop-scraper`, query: "carhartt jacket" },
+  { name: "mercari", actor: `${OWNER}~mercari-scraper`, query: "nintendo switch" },
+  { name: "offerup", actor: `${OWNER}~offerup-scraper`, query: "nintendo switch" },
+  { name: "craigslist", actor: `${OWNER}~craigslist-scraper`, query: "nintendo switch" },
+  { name: "ebay", actor: `${OWNER}~ebay-scraper`, query: "nintendo switch" },
+  { name: "hibid", actor: `${OWNER}~hibid-auction-scraper`, query: "macbook" },
+  { name: "nextdoor", actor: `${OWNER}~nextdoor-scraper`, query: "free", note: "needs logged-in cookies — expect 0 without them" },
 ];
 
 const ok = (b: boolean) => (b ? "✓" : "✗");

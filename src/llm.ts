@@ -94,7 +94,7 @@ async function completeOpenRouter(p: CompleteParams): Promise<string> {
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://github.com/steveguhlore/arbitrage-bot",
+      "HTTP-Referer": "https://github.com/guhlores-team/arbitrage-bot",
       "X-Title": "arbitrage-engine",
     },
     body: JSON.stringify({ model, max_tokens: p.maxTokens ?? 1000, messages }),

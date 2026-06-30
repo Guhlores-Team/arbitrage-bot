@@ -20,7 +20,7 @@ Apify Store to monetize** (rental or pay-per-result).
 | `nextdoor/` | ⚠️ blocked / needs work | BUY source (hyperlocal; needs cookies) |
 | `auctions-hibid/` | ✅ working (verified) | BUY source (estate/liquidation lots) |
 
-Status from `npm run doctor:actors`; blocked actors are anti-bot/cookie issues, not code bugs — see DESLOPPIFY.md M9.
+Status from `npm run doctor:actors`; blocked actors are anti-bot/cookie issues, not code bugs — see DESLOPPIFY.md M9. The health check assumes the actors are owned by the `Guhlore` Apify account — set `APIFY_ACTOR_OWNER=<your-apify-account>` if they live under a different account (e.g. a team).
 
 > The fashion/sneaker/local/auction actors use **best-effort selectors** — they
 > follow each site's current markup and may need a tweak in `extractCards()` after
