@@ -20,6 +20,28 @@ export function proxyUrl(): string | undefined {
   return process.env.SCRAPER_PROXY || undefined;
 }
 
+/**
+ * Parse `[scheme://]user:pass@host:port` WITHOUT Node's URL parser, which throws
+ * "Invalid URL" when the credentials contain characters residential providers
+ * routinely use (`@`, `:`, `#`, `/`, …). Splits on the LAST `@` so a `@` in the
+ * password is handled, and the FIRST `:` in the creds so a `:` in the password is
+ * kept. Credentials are used raw (as the provider gives them).
+ */
+function parseProxy(raw?: string): { server: string; username?: string; password?: string } | undefined {
+  if (!raw) return undefined;
+  let s = raw.trim();
+  const scheme = /^(\w+):\/\//.exec(s)?.[1] ?? "http";
+  s = s.replace(/^\w+:\/\//, "");
+  const at = s.lastIndexOf("@");
+  const creds = at >= 0 ? s.slice(0, at) : "";
+  const hostport = at >= 0 ? s.slice(at + 1) : s;
+  if (!hostport) return undefined;
+  const ci = creds.indexOf(":");
+  const username = at >= 0 ? (ci >= 0 ? creds.slice(0, ci) : creds) : undefined;
+  const password = at >= 0 && ci >= 0 ? creds.slice(ci + 1) : undefined;
+  return { server: `${scheme}://${hostport}`, username, password };
+}
+
 /** Should this source's traffic go through the proxy? */
 export function proxyEnabledFor(source?: string): boolean {
   if (!proxyUrl()) return false;
@@ -47,7 +69,13 @@ export function blockedHint(source: string, status: number, url?: string): strin
 
 let _dispatcher: ProxyAgent | undefined;
 function dispatcher(): ProxyAgent {
-  return (_dispatcher ??= new ProxyAgent(proxyUrl()!));
+  if (_dispatcher) return _dispatcher;
+  const p = parseProxy(proxyUrl())!;
+  // Pass credentials as a Basic auth token, not embedded in the URI — undici's
+  // URI parser rejects special characters the same way Node's URL does.
+  const opts: any = { uri: p.server };
+  if (p.username != null) opts.token = `Basic ${Buffer.from(`${p.username}:${p.password ?? ""}`).toString("base64")}`;
+  return (_dispatcher = new ProxyAgent(opts));
 }
 
 /** Playwright `proxy` option, or undefined if this source shouldn't be proxied. */
@@ -55,16 +83,7 @@ export function playwrightProxy(
   source?: string,
 ): { server: string; username?: string; password?: string } | undefined {
   if (!proxyEnabledFor(source)) return undefined;
-  try {
-    const u = new URL(proxyUrl()!);
-    return {
-      server: `${u.protocol}//${u.host}`,
-      username: u.username ? decodeURIComponent(u.username) : undefined,
-      password: u.password ? decodeURIComponent(u.password) : undefined,
-    };
-  } catch {
-    return undefined;
-  }
+  return parseProxy(proxyUrl());
 }
 
 /**
