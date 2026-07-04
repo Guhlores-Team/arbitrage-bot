@@ -110,6 +110,13 @@ export async function runPipelineDetailed(
       log.debug("skip: over price cap", { id: listing.id, price: listing.price, cap: opts.hardPriceCap });
       return;
     }
+    // No/zero price = "contact for price" or a parse miss, not a real buy price.
+    // Valuing it yields nonsense ($0 buy → infinite margin), so skip it.
+    if (!(listing.price > 0)) {
+      stats.pricedOut++;
+      log.debug("skip: no/zero price", { id: listing.id, title: listing.rawTitle?.slice(0, 60) });
+      return;
+    }
 
     // 1. identify the real product (vision + text)
     const identity = await identifyProduct(listing);
