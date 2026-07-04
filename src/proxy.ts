@@ -29,7 +29,21 @@ export function proxyUrl(): string | undefined {
  */
 function parseProxy(raw?: string): { server: string; username?: string; password?: string } | undefined {
   if (!raw) return undefined;
-  let s = raw.trim();
+  const trimmed = raw.trim();
+  // Preferred path: a well-formed URL (credentials may be percent-encoded).
+  try {
+    const u = new URL(trimmed);
+    return {
+      server: `${u.protocol}//${u.host}`,
+      username: u.username ? decodeURIComponent(u.username) : undefined,
+      password: u.password ? decodeURIComponent(u.password) : undefined,
+    };
+  } catch {
+    // Fall through — the creds contain raw characters URL parsing rejects.
+  }
+  // Manual parse for raw special-char credentials: split the LAST `@` (so a `@`
+  // in the password is handled) and the FIRST `:` in the creds (so a `:` is kept).
+  let s = trimmed;
   const scheme = /^(\w+):\/\//.exec(s)?.[1] ?? "http";
   s = s.replace(/^\w+:\/\//, "");
   const at = s.lastIndexOf("@");
