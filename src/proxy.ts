@@ -7,6 +7,9 @@ import { fetch as undiciFetch, ProxyAgent } from "undici";
  *
  *   SCRAPER_PROXY=http://user:pass@host:port
  *   SCRAPER_PROXY_SOURCES=craigslist,facebook   # optional: only proxy these
+ *   SCRAPER_STICKY_LIFETIME=10m                  # optional: pin one IP per scan
+ *                                                # (IPRoyal-style; stops per-request
+ *                                                #  IP rotation from timing out SPAs)
  *
  * If SCRAPER_PROXY_SOURCES is unset, all sources are proxied. Scope it when a
  * proxy helps some sources (Craigslist/Facebook) but hurts others whose results
@@ -56,6 +59,21 @@ function parseProxy(raw?: string): { server: string; username?: string; password
   return { server: `${scheme}://${hostport}`, username, password };
 }
 
+/**
+ * Append an IPRoyal-style sticky-session suffix to the proxy password so every
+ * request in one scan exits through the SAME residential IP. Without it the
+ * gateway rotates IP per request, which breaks SPA loads (the exit IP changes
+ * mid-page → net::ERR_TIMED_OUT) and makes feeds like Craigslist 403 on the
+ * inconsistent origin. Opt-in via SCRAPER_STICKY_LIFETIME (e.g. "10m"); the
+ * session id is random per call, so separate scans still rotate across the pool.
+ */
+function withStickySession<T extends { password?: string } | undefined>(p: T): T {
+  const life = process.env.SCRAPER_STICKY_LIFETIME;
+  if (!p || !life || p.password == null) return p;
+  const sid = Math.random().toString(36).slice(2, 10);
+  return { ...p, password: `${p.password}_session-${sid}_lifetime-${life}` };
+}
+
 /** Should this source's traffic go through the proxy? */
 export function proxyEnabledFor(source?: string): boolean {
   if (!proxyUrl()) return false;
@@ -84,7 +102,7 @@ export function blockedHint(source: string, status: number, url?: string): strin
 let _dispatcher: ProxyAgent | undefined;
 function dispatcher(): ProxyAgent {
   if (_dispatcher) return _dispatcher;
-  const p = parseProxy(proxyUrl())!;
+  const p = withStickySession(parseProxy(proxyUrl()))!;
   // Pass credentials as a Basic auth token, not embedded in the URI — undici's
   // URI parser rejects special characters the same way Node's URL does.
   const opts: any = { uri: p.server };
@@ -97,7 +115,7 @@ export function playwrightProxy(
   source?: string,
 ): { server: string; username?: string; password?: string } | undefined {
   if (!proxyEnabledFor(source)) return undefined;
-  return parseProxy(proxyUrl());
+  return withStickySession(parseProxy(proxyUrl()));
 }
 
 /**
