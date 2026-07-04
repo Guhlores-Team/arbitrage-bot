@@ -149,15 +149,13 @@ export async function runPipelineDetailed(
       return;
     }
 
-    // 2a. cheap price pre-filter: if asking >= median sold, skip the LLM verify
-    const quickMedian = median(rawComps.map((c) => c.soldPrice));
-    if (listing.price > 0 && listing.price >= quickMedian) {
-      stats.askAboveMedian++;
-      log.debug("skip: asking >= median comp", { id: listing.id, price: listing.price, median: quickMedian });
-      return;
-    }
-
-    // 3. verify which comps truly match (LLM rerank, cached)
+    // 3. verify which comps truly match the identified item (LLM rerank, cached).
+    // This MUST run before the price gate below: a keyword comp search returns
+    // accessories too (a $14 phone case alongside $400 phones), so a median over
+    // the RAW set is meaningless — it would drop a real underpriced item as
+    // "asking >= median" against a case-polluted median. Value only vs. verified
+    // comps. (Costs one verify per listing-with-comps; the calls are cached and
+    // cheap, and correctness here is the whole point.)
     const verified = await verifyMatches(identity, rawComps);
     if (verified.length === 0) {
       stats.noMatch++;
@@ -165,6 +163,15 @@ export async function runPipelineDetailed(
       return;
     }
     const matchedComps = verified.map((v) => v.comp);
+
+    // 3a. price gate on the CLEAN comp set: if asking is already at/above the
+    // median of the VERIFIED comps, there's no headroom — skip before scoring.
+    const matchedMedian = median(matchedComps.map((c) => c.soldPrice));
+    if (listing.price >= matchedMedian) {
+      stats.askAboveMedian++;
+      log.debug("skip: asking >= median comp", { id: listing.id, price: listing.price, median: matchedMedian });
+      return;
+    }
     const matchConfidence = avg(verified.map((v) => v.verdict.confidence));
     // typical condition gap between the comps and our item (signed median)
     const conditionDelta = median(verified.map((v) => v.verdict.conditionDelta));

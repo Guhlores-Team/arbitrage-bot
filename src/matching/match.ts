@@ -13,8 +13,9 @@ const verdictCache = new Map<string, MatchVerdict>();
  *   Stage 1 (cheap): if we have a canonicalCode, trust it and skip the LLM.
  *   Stage 2 (LLM):   otherwise verify each candidate with a strict-JSON check.
  *
- * Caller is expected to have already price-filtered (don't bother matching
- * listings with no possible margin) — that pre-filter is the biggest cost saver.
+ * Runs before the caller's price/median gate on purpose: a raw keyword comp
+ * search returns accessories, so the median that gate needs must be taken over
+ * VERIFIED comps only, not the raw set. Verdicts are cached to keep it cheap.
  */
 export async function verifyMatches(
   identity: ProductIdentity,
