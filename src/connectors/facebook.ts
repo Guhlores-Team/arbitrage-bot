@@ -9,6 +9,7 @@ import {
   gotoWithRetry,
 } from "./stealth.js";
 import { parseCard, type RawCard } from "./parse.js";
+import { blockHeavyResources } from "./blockheavy.js";
 import { classifyPage } from "./diagnose.js";
 
 /**
@@ -79,6 +80,7 @@ export class FacebookConnector implements SourceConnector {
     try {
       // Apply anti-detection patches before any page navigates.
       await ctx.addInitScript(STEALTH_INIT_SCRIPT);
+      await blockHeavyResources(ctx);
 
       const page = await ctx.newPage();
       page.setDefaultNavigationTimeout(this.cfg.navTimeoutMs);

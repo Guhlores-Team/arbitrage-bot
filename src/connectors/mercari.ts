@@ -2,6 +2,7 @@ import type { SourceListing } from "../types.js";
 import type { SearchQuery, SourceConnector } from "./connector.js";
 import { pickFingerprint, contextOptions, STEALTH_INIT_SCRIPT, humanScroll, humanPause, gotoWithRetry } from "./stealth.js";
 import { parseCard, type RawCard } from "./parse.js";
+import { blockHeavyResources } from "./blockheavy.js";
 import { classifyPage } from "./diagnose.js";
 
 /**
@@ -54,6 +55,7 @@ export class MercariConnector implements SourceConnector {
         proxy: opts.proxy,
       });
       await ctx.addInitScript(STEALTH_INIT_SCRIPT);
+      await blockHeavyResources(ctx);
       const page = await ctx.newPage();
       page.setDefaultNavigationTimeout(this.cfg.navTimeoutMs);
 
