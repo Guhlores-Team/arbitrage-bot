@@ -49,6 +49,17 @@ const crawler = new PlaywrightCrawler({
       .map(parseCard)
       .filter((l) => l.title && (!maxPrice || l.price === 0 || l.price <= maxPrice));
 
+    if (out.length === 0) {
+      // Diagnose 0-result: is it a bot-challenge/redirect, or did the card markup
+      // change? Report the page identity + how many candidate anchors exist.
+      const diag = await page.evaluate(() => ({
+        detail: document.querySelectorAll('a[href*="/item/detail/"]').length,
+        item: document.querySelectorAll('a[href*="/item/"]').length,
+        anchors: document.querySelectorAll("a").length,
+        bodyLen: document.body ? document.body.innerText.length : 0,
+      }));
+      log.warning(`0 listings — title="${await page.title()}" url="${page.url()}" ${JSON.stringify(diag)}`);
+    }
     log.info(`Scraped ${out.length} listings for "${query}".`);
     await Actor.pushData(out);
   },
