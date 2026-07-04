@@ -40,7 +40,10 @@ export async function verifyMatches(
       verdict = llmConfigured() ? await llmVerify(identity, comp) : heuristicVerify(identity, comp);
       verdictCache.set(key, verdict);
     }
-    if (verdict.isMatch) results.push({ comp, verdict });
+    // Optional floor: reject weak matches so a loose LLM can't pad the comp set
+    // with wrong-tier products (MIN_COMP_MATCH_CONFIDENCE, default 0 = off).
+    const minConf = Number(process.env.MIN_COMP_MATCH_CONFIDENCE ?? 0);
+    if (verdict.isMatch && verdict.confidence >= minConf) results.push({ comp, verdict });
   }
 
   return results;
@@ -76,6 +79,11 @@ PRODUCT A (item to flip):
 brand=${identity.brand ?? "?"} model=${identity.model ?? "?"} variant=${JSON.stringify(identity.variant ?? {})} condition=${identity.condition}
 
 PRODUCT B (sold comp): "${comp.title}" condition=${comp.condition}
+
+STRICT: a different model number, tier, capacity/storage, size, generation, or
+edition is NOT a match even within the same brand or product line — e.g.
+RTX 4080 ≠ RTX 4090, 128GB ≠ 256GB, "Pro" ≠ base. Bundles/lots of multiple items
+are also NOT a match to a single item. When unsure, isMatch=false.
 
 Respond with ONLY JSON:
 {"isMatch":bool,"confidence":0..1,"variantMatch":bool,"conditionDelta":int,"reasoning":string}
