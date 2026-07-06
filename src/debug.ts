@@ -1,7 +1,7 @@
 import "./env.js";
 import { health } from "./health.js";
 import { buildComper, compInfo } from "./comps.js";
-import { pickSource } from "./sources.js";
+import { resolveSource } from "./sources.js";
 import { runPipelineDetailed } from "./pipeline.js";
 import { serpApiUsage, serpApiSearchCount, resetSerpApiSearchCount } from "./connectors/serpapi.js";
 
@@ -11,8 +11,10 @@ import { serpApiUsage, serpApiSearchCount, resetSerpApiSearchCount } from "./con
  *
  *   npm run debug                         # demo source, "nintendo switch"
  *   npm run debug -- "airpods pro" offerup 150
+ *   npm run debug -- "switch" offerup,mercari 300   # a list, or "all"
  *
- * Args: [query] [source] [hardPriceCap]. Forces verbose logs, runs a real scan,
+ * Args: [query] [source] [hardPriceCap]. Source is one name, a comma-separated
+ * list, or "all". Forces verbose logs, runs a real scan,
  * and prints the funnel (why listings dropped), the top opportunities, your
  * SerpApi quota, and how many comp lookups this run actually cost.
  */
@@ -41,7 +43,7 @@ async function main() {
 
   resetSerpApiSearchCount();
   console.log("\n  Running pipeline (debug logs below) …\n");
-  const { opportunities, stats } = await runPipelineDetailed(pickSource(source), buildComper(), { query, limit: 10 }, { hardPriceCap });
+  const { opportunities, stats } = await runPipelineDetailed(resolveSource(source), buildComper(), { query, limit: 10 }, { hardPriceCap });
 
   console.log("\n  Funnel:");
   console.log(`   listings pulled        : ${stats.listings}`);
